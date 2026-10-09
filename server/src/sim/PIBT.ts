@@ -8,7 +8,9 @@ export interface HiveMessage {
 
 export function pibtStep(
   robots: Robot[],
-  grid: Grid
+  grid: Grid,
+  emergencyReservedCells?: Set<string>,
+  emergencyRobotId?: number | null
 ): { moves: Map<number, [number, number]>; messages: HiveMessage[] } {
   const activeMap = new Map<number, Robot>();
   for (const r of robots) {
@@ -24,9 +26,18 @@ export function pibtStep(
   const messages: HiveMessage[] = [];
 
   const basePriority = (r: Robot): number => {
-    if (!r.task) return 0;
-    const [gx, gy] = r.task.goal;
-    return r.task.priority * 10000 - (Math.abs(r.x - gx) + Math.abs(r.y - gy));
+    if (r.isEmergency || (emergencyRobotId !== undefined && emergencyRobotId !== null && r.id === emergencyRobotId)) {
+      const gx = r.path && r.path.length > 0 ? r.path[r.path.length - 1][0] : r.x;
+      const gy = r.path && r.path.length > 0 ? r.path[r.path.length - 1][1] : r.y;
+      return 10000000 - (Math.abs(r.x - gx) + Math.abs(r.y - gy));
+    }
+    if (!r.task && !r.chargeTarget) return 0;
+    const goal = r.task ? r.task.goal : r.chargeTarget!;
+    const [gx, gy] = goal;
+    const pri = r.task ? r.task.priority : 1;
+    let val = pri * 10000 - (Math.abs(r.x - gx) + Math.abs(r.y - gy));
+    if (r.isYielding) val -= 50000;
+    return val;
   };
 
   const priorities = new Map<number, number>();
@@ -43,17 +54,39 @@ export function pibtStep(
   const claimed = new Map<string, number>();
   const inCall = new Set<number>();
 
+  const isReserved = (x: number, y: number): boolean => {
+    return emergencyReservedCells !== undefined && emergencyReservedCells.has(`${x},${y}`);
+  };
+
   const candidates = (robot: Robot): [number, number][] => {
     const seen = new Set<string>();
     const out: [number, number][] = [];
+    const isEmerg = robot.isEmergency || (emergencyRobotId !== undefined && emergencyRobotId !== null && robot.id === emergencyRobotId);
+    const currentlyOnCorridor = isReserved(robot.x, robot.y);
 
     const add = (x: number, y: number) => {
       const key = `${x},${y}`;
       if (!seen.has(key) && grid.isFree(x, y)) {
+        // Normal robots cannot enter reserved corridor cells from outside
+        if (!isEmerg && isReserved(x, y)) {
+          // Only allow if robot is already on this exact cell and has no other choice
+          if (x !== robot.x || y !== robot.y) {
+            return;
+          }
+        }
         seen.add(key);
         out.push([x, y]);
       }
     };
+
+    // If a normal robot is currently trapped on the corridor, prioritize non-reserved neighbors to yield OUT immediately
+    if (!isEmerg && currentlyOnCorridor) {
+      const allNbrs = grid.getNeighbors(robot.x, robot.y);
+      const nonCorridorNbrs = allNbrs.filter(([nx, ny]) => !isReserved(nx, ny));
+      for (const [nx, ny] of nonCorridorNbrs) {
+        add(nx, ny);
+      }
+    }
 
     // 1. Next planned waypoint
     if (robot.path && robot.pathIdx + 1 < robot.path.length) {
@@ -144,9 +177,12 @@ export function pibtStep(
         if (tryMove(occ, depth + 1)) {
           const occMove = result.get(occ);
           if (!occMove || occMove[0] !== nx || occMove[1] !== ny) {
+            const isEmergPush = r.isEmergency || (emergencyRobotId !== undefined && emergencyRobotId !== null && r.id === emergencyRobotId);
             messages.push({
-              type: 'yield',
-              msg: `R${occ} yields/reverses to clear intersection for R${rid}`,
+              type: isEmergPush ? 'emergency' : 'yield',
+              msg: isEmergPush
+                ? `🚨 R${occ} yields to clear Dynamic Emergency Corridor for R${rid}`
+                : `R${occ} yields/reverses to clear intersection for R${rid}`,
             });
             result.set(rid, [nx, ny]);
             claimed.set(key, rid);
@@ -191,7 +227,7 @@ export function pibtStep(
       ) {
         messages.push({
           type: 'detour',
-          msg: `R${rid} reverses/detours to avoid collision and recalculate long path`,
+          msg: `R${rid} reverses/detours to avoid collision and recalculate path`,
         });
       }
     }

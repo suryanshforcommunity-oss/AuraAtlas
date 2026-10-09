@@ -4,6 +4,7 @@ import { WarehouseCanvas } from './components/WarehouseCanvas';
 import { Sidebar } from './components/Sidebar';
 import { OrderModal } from './components/OrderModal';
 import { MapConfigModal } from './components/MapConfigModal';
+import { EmergencyCorridorModal } from './components/EmergencyCorridorModal';
 import { LandingPage } from './components/LandingPage';
 import { TelemetryPage } from './components/TelemetryPage';
 import { AnalyticsPage } from './components/AnalyticsPage';
@@ -20,6 +21,7 @@ export const App: React.FC = () => {
 
   const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
   const [isMapModalOpen, setIsMapModalOpen] = useState<boolean>(false);
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState<boolean>(false);
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -135,6 +137,14 @@ export const App: React.FC = () => {
     apiCall(`/api/station/${sid}/refill`, 'POST', { qty, priority });
   };
 
+  const handleActivateEmergency = async (robotId: number, targetX: number, targetY: number) => {
+    return await apiCall('/api/emergency/activate', 'POST', { robotId, targetX, targetY });
+  };
+
+  const handleCancelEmergency = async () => {
+    return await apiCall('/api/emergency/cancel', 'POST');
+  };
+
   const handleSelectBenchmarkFromLanding = async (mapName: string) => {
     try {
       await handleSwitchMap(mapName, 8, 1);
@@ -198,6 +208,7 @@ export const App: React.FC = () => {
         onClearBlocks={handleClearBlocks}
         onOpenOrderModal={() => setIsOrderModalOpen(true)}
         onOpenMapModal={() => setIsMapModalOpen(true)}
+        onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
         onNavigateHome={() => setActiveView('landing')}
         onNavigateArchitecture={handleNavigateArchitecture}
         onNavigateTelemetry={() => setActiveView('telemetry')}
@@ -215,6 +226,8 @@ export const App: React.FC = () => {
           onBlockCell={handleBlockCell}
           onFailRobot={handleFailRobot}
           onClearBlocks={handleClearBlocks}
+          onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
+          onCancelEmergency={handleCancelEmergency}
         />
 
         {/* Right Dashboard Sidebar */}
@@ -240,6 +253,15 @@ export const App: React.FC = () => {
         onClose={() => setIsMapModalOpen(false)}
         onSwitchMap={handleSwitchMap}
         onDownloadMap={handleDownloadMap}
+      />
+
+      {/* Emergency Corridor Modal */}
+      <EmergencyCorridorModal
+        isOpen={isEmergencyModalOpen}
+        onClose={() => setIsEmergencyModalOpen(false)}
+        state={simState}
+        onActivate={handleActivateEmergency}
+        onCancel={handleCancelEmergency}
       />
     </div>
   );

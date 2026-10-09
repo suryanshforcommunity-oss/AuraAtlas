@@ -1,6 +1,19 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { SimulationState, GridData } from '../types/fleet';
-import { ZoomIn, ZoomOut, Maximize2, Move, Trash2, Zap, CheckCircle2 } from 'lucide-react';
+import { SimulationState, GridData, EmergencyStatus } from '../types/fleet';
+import {
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Trash2,
+  CheckCircle2,
+  Siren,
+  AlertTriangle,
+  RotateCw,
+  XCircle,
+  ShieldAlert,
+  ArrowRight,
+  Route
+} from 'lucide-react';
 
 interface WarehouseCanvasProps {
   state: SimulationState | null;
@@ -10,6 +23,8 @@ interface WarehouseCanvasProps {
   onBlockCell: (x: number, y: number) => void;
   onFailRobot?: (rid: number) => void;
   onClearBlocks?: () => void;
+  onOpenEmergencyModal?: () => void;
+  onCancelEmergency?: () => void;
 }
 
 export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
@@ -19,6 +34,8 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
   blockMode,
   onBlockCell,
   onClearBlocks,
+  onOpenEmergencyModal,
+  onCancelEmergency,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -30,6 +47,7 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
   const [cellSize, setCellSize] = useState<number>(24);
 
   const grid: GridData | undefined = state?.grid;
+  const emergency = state?.emergency;
 
   // Calculate dynamic cell size
   useEffect(() => {
@@ -51,8 +69,10 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
     const width = grid.width * CELL;
     const height = grid.height * CELL;
 
-    canvas.width = width;
-    canvas.height = height;
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
 
     ctx.save();
     ctx.clearRect(0, 0, width, height);
@@ -66,22 +86,19 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
         const isObstacle = grid.cells[y][x] === 1;
 
         if (isObstacle) {
-          // Aesthetic Storage Rack Pod / Obstacle Block
+          // Storage Rack Pod / Obstacle Block
           const rx = x * CELL;
           const ry = y * CELL;
           const pad = CELL > 14 ? 1.5 : 0;
 
-          // Main rack body
           ctx.fillStyle = '#1e293b';
           ctx.fillRect(rx + pad, ry + pad, CELL - pad * 2, CELL - pad * 2);
 
-          // Rack inner accent border & detail lines
           if (CELL > 12) {
             ctx.strokeStyle = '#334155';
             ctx.lineWidth = 1;
             ctx.strokeRect(rx + pad + 0.5, ry + pad + 0.5, CELL - pad * 2 - 1, CELL - pad * 2 - 1);
 
-            // Subtle rack shelf dividers
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
             ctx.beginPath();
             ctx.moveTo(rx + CELL * 0.2, ry + CELL / 2);
@@ -95,7 +112,6 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
             ctx.lineWidth = 0.5;
             ctx.strokeRect(x * CELL, y * CELL, CELL, CELL);
 
-            // Subtle center node dot
             ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
             ctx.fillRect(x * CELL + CELL / 2 - 0.5, y * CELL + CELL / 2 - 0.5, 1, 1);
           }
@@ -112,13 +128,96 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       });
     }
 
-    // 3. Proactive Conflict Prediction Points
+    // 3. Dynamic Emergency Corridor Layer (Red / Orange glowing reservation)
+    if (emergency && emergency.active && emergency.reservedCells && emergency.reservedCells.length > 0) {
+      const now = Date.now();
+      const pulse = 0.25 + 0.15 * Math.sin(now * 0.006);
+
+      // 3a. Corridor Base Cells Fill & Borders
+      emergency.reservedCells.forEach(([cx, cy]) => {
+        const rx = cx * CELL;
+        const ry = cy * CELL;
+
+        // Glowing red fill
+        ctx.fillStyle = `rgba(239, 68, 68, ${pulse})`;
+        ctx.fillRect(rx, ry, CELL, CELL);
+
+        // Crisp red border
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(rx + 0.5, ry + 0.5, CELL - 1, CELL - 1);
+      });
+
+      // 3b. Intersections Highlight (Orange warning crosshatch)
+      if (emergency.intersections && emergency.intersections.length > 0) {
+        emergency.intersections.forEach(([ix, iy]) => {
+          const rx = ix * CELL;
+          const ry = iy * CELL;
+          ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+          ctx.fillRect(rx, ry, CELL, CELL);
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(rx + 1, ry + 1, CELL - 2, CELL - 2);
+        });
+      }
+
+      // 3c. Corridor Route Flow Line (Bright Red Glow with directional chevrons)
+      if (emergency.route && emergency.route.length > 1) {
+        ctx.beginPath();
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = Math.max(2.5, CELL * 0.15);
+        ctx.setLineDash([CELL * 0.4, CELL * 0.2]);
+        ctx.lineDashOffset = -(now * 0.02) % (CELL * 0.6);
+        ctx.moveTo(emergency.route[0][0] * CELL + CELL / 2, emergency.route[0][1] * CELL + CELL / 2);
+        for (let i = 1; i < emergency.route.length; i++) {
+          ctx.lineTo(emergency.route[i][0] * CELL + CELL / 2, emergency.route[i][1] * CELL + CELL / 2);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // 4. Emergency Destination Marker (Pulsing Red Beacon)
+    if (emergency && emergency.active && emergency.destination) {
+      const [dx, dy] = emergency.destination;
+      const dcx = dx * CELL + CELL / 2;
+      const dcy = dy * CELL + CELL / 2;
+      const now = Date.now();
+      const beaconRadius = Math.max(CELL * 0.6, 8) + (Math.sin(now * 0.008) + 1) * (CELL * 0.2);
+
+      // Outer Beacon Ring
+      ctx.beginPath();
+      ctx.arc(dcx, dcy, beaconRadius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+      ctx.fill();
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Inner Target Crosshair
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(dcx - CELL * 0.35, dcy);
+      ctx.lineTo(dcx + CELL * 0.35, dcy);
+      ctx.moveTo(dcx, dcy - CELL * 0.35);
+      ctx.lineTo(dcx, dcy + CELL * 0.35);
+      ctx.stroke();
+
+      if (CELL > 14) {
+        ctx.fillStyle = '#ef4444';
+        ctx.font = `bold ${Math.max(CELL * 0.32, 8)}px JetBrains Mono, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('DEST', dcx, dcy - beaconRadius - 3);
+      }
+    }
+
+    // 5. Proactive Conflict Prediction Points
     if (state?.conflicts && state.conflicts.length > 0) {
       state.conflicts.forEach(cf => {
         const [x, y] = cf.cell;
         const alpha = cf.confidence * 0.85;
 
-        // Glowing collision warning box
         ctx.fillStyle = `rgba(245, 158, 11, ${alpha * 0.35})`;
         ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
 
@@ -126,7 +225,6 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x * CELL + 1.5, y * CELL + 1.5, CELL - 3, CELL - 3);
 
-        // Warning cross hatch
         if (CELL > 14) {
           ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
           ctx.lineWidth = 1;
@@ -138,13 +236,12 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       });
     }
 
-    // 4. Stations Rendering (Pick = Emerald, Drop = Orange)
+    // 6. Stations Rendering (Pick = Emerald, Drop = Orange, Charge = Cyan)
     (grid.pick_stations || []).forEach(([px, py]) => {
       const st = (state?.stations || []).find(s => s.x === px && s.y === py && s.type === 'pick');
       const cx = px * CELL;
       const cy = py * CELL;
 
-      // Glow fill
       ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
       ctx.fillRect(cx, cy, CELL, CELL);
 
@@ -180,7 +277,6 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       }
     });
 
-    // 4b. Charging Stations Rendering (Electric Cyan ⚡)
     (grid.charging_stations || []).forEach(([chx, chy]) => {
       const cx = chx * CELL;
       const cy = chy * CELL;
@@ -200,42 +296,28 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       }
     });
 
-    // 5. Robot Dynamic Planned Paths & Target Lines
+    // 7. Alternate Rerouted Routes (Blue Overlays) & Normal Paths
     if (routeOn && state?.robots) {
       state.robots.forEach(r => {
-        if (!r.target || r.state === 'idle' || r.state === 'failed') return;
-        const sx = r.x * CELL + CELL / 2;
-        const sy = r.y * CELL + CELL / 2;
-        const tx = r.target[0] * CELL + CELL / 2;
-        const ty = r.target[1] * CELL + CELL / 2;
-
-        // Path trace line
-        ctx.beginPath();
-        ctx.strokeStyle = r.phase === 'pickup' ? 'rgba(52, 211, 153, 0.4)' : `${r.color}77`;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash(r.phase === 'pickup' ? [3, 3] : []);
-        ctx.moveTo(sx, sy);
-        ctx.lineTo(tx, ty);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Target station pulse ring
-        ctx.beginPath();
-        ctx.strokeStyle = r.phase === 'pickup' ? '#34d399' : r.color;
-        ctx.lineWidth = 1.5;
-        ctx.arc(tx, ty, Math.max(CELL * 0.45, 5), 0, Math.PI * 2);
-        ctx.stroke();
-      });
-    }
-
-    // Planned path waypoints
-    if (state?.robots) {
-      state.robots.forEach(r => {
         if (!r.path || r.path.length < 2) return;
+        const isEmerg = r.isEmergency || (emergency?.active && emergency.robotId === r.id);
+        const isRerouted = r.isRerouted;
+
         ctx.beginPath();
-        ctx.strokeStyle = `${r.color}44`;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([2, 3]);
+        if (isEmerg) {
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 2.5;
+        } else if (isRerouted) {
+          // Alternate route in distinct blue
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([3, 2]);
+        } else {
+          ctx.strokeStyle = `${r.color}44`;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([2, 3]);
+        }
+
         ctx.moveTo(r.path[0][0] * CELL + CELL / 2, r.path[0][1] * CELL + CELL / 2);
         for (let i = 1; i < r.path.length; i++) {
           ctx.lineTo(r.path[i][0] * CELL + CELL / 2, r.path[i][1] * CELL + CELL / 2);
@@ -245,47 +327,135 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       });
     }
 
-    // 6. Robots Rendering (Sleek Autonomous Mobile Robots)
+    // 8. Robots Rendering (with Emergency Siren Animation & Yield Indicators)
     if (state?.robots) {
+      const now = Date.now();
+      const sirenFlash = Math.sin(now * 0.015) > 0; // High frequency siren blink (~5Hz)
+      const sirenPulse = (Math.sin(now * 0.009) + 1) / 2; // Pulsing halo radius multiplier
+
       state.robots.forEach(r => {
         const cx = r.x * CELL + CELL / 2;
         const cy = r.y * CELL + CELL / 2;
         const rad = Math.max(CELL * 0.38, 5);
+        const isEmerg = r.isEmergency || (emergency?.active && emergency.robotId === r.id);
+        const isYielding = r.isYielding;
 
-        // Direction Vector (Heading arrow)
+        // Heading Direction Vector
         let angle = 0;
         if (r.path && r.path.length > 1) {
           const next = r.path[1];
           angle = Math.atan2(next[1] - r.y, next[0] - r.x);
         }
 
-        // Outer Aura Ring
-        if (r.state !== 'failed') {
+        // --- EMERGENCY SIREN ANIMATION ---
+        if (isEmerg && r.state !== 'failed') {
+          // 1. Pulsing Red Halo / Aura Rings
+          const haloRad = rad + 3 + sirenPulse * (CELL * 0.6);
           ctx.beginPath();
-          ctx.arc(cx, cy, rad + 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = `${r.color}22`;
+          ctx.arc(cx, cy, haloRad, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(239, 68, 68, ${0.35 - sirenPulse * 0.25})`;
           ctx.fill();
-          ctx.strokeStyle = r.phase === 'pickup' ? '#34d399' : r.color;
-          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+          ctx.lineWidth = 1.8;
           ctx.stroke();
+
+          // 2. Rotating Dual Siren Light Beams
+          const sirenAngle = (now * 0.01) % (Math.PI * 2);
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(sirenAngle);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.arc(0, 0, rad * 1.6, -Math.PI / 6, Math.PI / 6);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.arc(0, 0, rad * 1.6, Math.PI - Math.PI / 6, Math.PI + Math.PI / 6);
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.6)';
+          ctx.fill();
+          ctx.restore();
+
+          // 3. Blinking Siren Body (Alternating Bright Red & Crimson)
+          ctx.beginPath();
+          ctx.arc(cx, cy, rad + 1, 0, Math.PI * 2);
+          ctx.fillStyle = sirenFlash ? '#ef4444' : '#991b1b';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Emergency Badge Tag
+          if (CELL > 12) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.max(CELL * 0.35, 8)}px JetBrains Mono, monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🚨', cx, cy);
+          }
+        }
+        // --- YIELDING ROBOT INDICATOR (Yellow Outer Ring) ---
+        else if (isYielding && r.state !== 'failed') {
+          ctx.beginPath();
+          ctx.arc(cx, cy, rad + 3, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(234, 179, 8, 0.3)';
+          ctx.fill();
+          ctx.strokeStyle = '#eab308';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+          ctx.fillStyle = `${r.color}bb`;
+          ctx.fill();
+          ctx.strokeStyle = '#eab308';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          if (CELL > 11) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.max(CELL * 0.35, 8)}px JetBrains Mono, monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${r.battery}%`, cx, cy);
+          }
+        }
+        // --- NORMAL ROBOT RENDERING ---
+        else {
+          if (r.state !== 'failed') {
+            ctx.beginPath();
+            ctx.arc(cx, cy, rad + 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = `${r.color}22`;
+            ctx.fill();
+            ctx.strokeStyle = r.phase === 'pickup' ? '#34d399' : r.color;
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+          }
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+          ctx.fillStyle =
+            r.state === 'failed'
+              ? '#475569'
+              : r.state === 'waiting'
+              ? `${r.color}aa`
+              : r.color;
+          ctx.fill();
+          ctx.strokeStyle = '#020617';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          if (CELL > 11) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.max(CELL * 0.35, 8)}px JetBrains Mono, monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(r.battery !== undefined ? `${r.battery}%` : `${r.id}`, cx, cy);
+          }
         }
 
-        // Robot Core Circle
-        ctx.beginPath();
-        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-        ctx.fillStyle =
-          r.state === 'failed'
-            ? '#475569'
-            : r.state === 'waiting'
-            ? `${r.color}aa`
-            : r.color;
-        ctx.fill();
-        ctx.strokeStyle = '#020617';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Heading Directional Arrow Pointer
-        if (r.state === 'moving' && CELL > 12) {
+        // Direction Arrow Pointer
+        if (r.state === 'moving' && CELL > 12 && !isEmerg) {
           ctx.save();
           ctx.translate(cx, cy);
           ctx.rotate(angle);
@@ -300,16 +470,7 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
           ctx.restore();
         }
 
-        // Robot ID & Battery percentage display
-        if (CELL > 11) {
-          ctx.fillStyle = '#ffffff';
-          ctx.font = `bold ${Math.max(CELL * 0.35, 8)}px JetBrains Mono, monospace`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(r.battery !== undefined ? `${r.battery}%` : `${r.id}`, cx, cy);
-        }
-
-        // Package Carrying Dot / Load Count Indicator
+        // Package Carrying Dot
         if (r.carrying > 0 && CELL > 12) {
           ctx.fillStyle = '#f59e0b';
           ctx.beginPath();
@@ -318,14 +479,6 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
           ctx.strokeStyle = '#020617';
           ctx.lineWidth = 1;
           ctx.stroke();
-
-          if (CELL > 16) {
-            ctx.fillStyle = '#000000';
-            ctx.font = `bold ${Math.max(CELL * 0.25, 7)}px JetBrains Mono, monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`${r.carrying}`, cx + rad * 0.7, cy - rad * 0.7);
-          }
         }
 
         // Failed X icon
@@ -343,13 +496,19 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
     }
 
     ctx.restore();
-  }, [canvasRef, grid, cellSize, state, heatOn, routeOn]);
+  }, [canvasRef, grid, cellSize, state, heatOn, routeOn, emergency]);
 
+  // Continuous animation loop for smooth 60fps siren blinking & halo pulsing
   useEffect(() => {
-    draw();
+    let animId: number;
+    const loop = () => {
+      draw();
+      animId = requestAnimationFrame(loop);
+    };
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
   }, [draw]);
 
-  // Click handler for cell blocking
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!blockMode || !grid || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
@@ -364,7 +523,6 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
     }
   };
 
-  // Dragging / Panning handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     if (blockMode) return;
     setIsDragging(true);
@@ -386,6 +544,62 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
     setOffset({ x: 0, y: 0 });
   };
 
+  // Status mapping helper
+  const getStatusBadge = (status?: EmergencyStatus) => {
+    switch (status) {
+      case 'active':
+        return {
+          label: 'CORRIDOR ACTIVE',
+          color: 'bg-rose-500/20 text-rose-300 border-rose-500/50',
+          icon: <Siren className="w-3.5 h-3.5 animate-pulse text-rose-400" />,
+        };
+      case 'planning':
+        return {
+          label: 'ROUTE PLANNING',
+          color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50',
+          icon: <Route className="w-3.5 h-3.5 animate-spin text-cyan-400" />,
+        };
+      case 'awaiting_clearance':
+        return {
+          label: 'AWAITING CLEARANCE',
+          color: 'bg-amber-500/20 text-amber-300 border-amber-500/50',
+          icon: <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />,
+        };
+      case 'replanning':
+        return {
+          label: 'REPLANNING',
+          color: 'bg-orange-500/20 text-orange-300 border-orange-500/50',
+          icon: <RotateCw className="w-3.5 h-3.5 animate-spin text-orange-400" />,
+        };
+      case 'completed':
+        return {
+          label: 'DELIVERY COMPLETED',
+          color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50',
+          icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
+        };
+      case 'released':
+        return {
+          label: 'CORRIDOR RELEASED',
+          color: 'bg-slate-800 text-slate-300 border-slate-700',
+          icon: <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />,
+        };
+      case 'failed':
+        return {
+          label: 'FAILED',
+          color: 'bg-rose-950/80 text-rose-400 border-rose-600',
+          icon: <XCircle className="w-3.5 h-3.5 text-rose-400" />,
+        };
+      default:
+        return {
+          label: 'INACTIVE',
+          color: 'bg-slate-900/80 text-slate-400 border-slate-800',
+          icon: <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />,
+        };
+    }
+  };
+
+  const statusBadge = getStatusBadge(emergency?.status);
+
   return (
     <div
       ref={containerRef}
@@ -395,13 +609,58 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* JOB FINISHED Glowing Top Notification Banner */}
+      {/* JOB FINISHED Notification Banner */}
       {state?.job_finished && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-semibold backdrop-blur-xl shadow-2xl shadow-emerald-500/20 animate-bounce">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>🎉 JOB FINISHED! All items picked and delivered. Robots parked at Charging Stations.</span>
+          <span>🎉 JOB FINISHED! All items delivered. Robots parked at Charging Stations.</span>
         </div>
       )}
+
+      {/* COMPACT EMERGENCY CORRIDOR STATUS HUD WIDGET */}
+      <div className="absolute top-4 right-4 z-30 flex flex-col items-end gap-2">
+        <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#0b0f19]/90 border border-slate-800/90 shadow-2xl backdrop-blur-md">
+          {/* Emergency Status Badge */}
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold ${statusBadge.color}`}>
+            {statusBadge.icon}
+            <span>{statusBadge.label}</span>
+          </div>
+
+          {/* Real-Time Swarm State Metrics */}
+          {emergency?.active && (
+            <div className="hidden sm:flex items-center gap-3 px-3 text-[11px] font-mono border-l border-slate-800 text-slate-300">
+              <span className="text-amber-400 font-bold flex items-center gap-1">
+                <span>{emergency.yieldingRobots?.length || 0}</span>
+                <span className="text-slate-400 font-normal">Yielding</span>
+              </span>
+              <span className="text-cyan-400 font-bold flex items-center gap-1">
+                <span>{emergency.reroutedRobots?.length || 0}</span>
+                <span className="text-slate-400 font-normal">Rerouted</span>
+              </span>
+            </div>
+          )}
+
+          {/* Quick Action Button */}
+          {emergency?.active ? (
+            <button
+              onClick={onCancelEmergency}
+              className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-mono font-bold transition-all"
+            >
+              Release
+            </button>
+          ) : (
+            onOpenEmergencyModal && (
+              <button
+                onClick={onOpenEmergencyModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 border border-rose-500/50 text-xs font-mono font-bold shadow-md shadow-rose-600/20 active:scale-95 transition-all"
+              >
+                <Siren className="w-3.5 h-3.5 text-rose-400" />
+                <span>Emergency Corridor</span>
+              </button>
+            )
+          )}
+        </div>
+      </div>
 
       {/* Dynamic Background Grid Mesh */}
       <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-20 pointer-events-none" />
@@ -466,7 +725,7 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       </div>
 
       {/* Legend Overlay */}
-      <div className="absolute top-4 left-4 z-20 hidden sm:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800/80 text-[11px] backdrop-blur-md">
+      <div className="absolute top-4 left-4 z-20 hidden lg:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800/80 text-[11px] backdrop-blur-md">
         <div className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded bg-emerald-500"></span>
           <span className="text-slate-300">Pick Station</span>
@@ -480,12 +739,12 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
           <span className="text-slate-300">Charging Pad</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded bg-slate-700"></span>
-          <span className="text-slate-300">Shelf Block</span>
+          <span className="w-2.5 h-2.5 rounded bg-rose-600 animate-pulse"></span>
+          <span className="text-slate-300">Emergency Corridor</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-          <span className="text-slate-300">Conflict Point</span>
+          <span className="w-2.5 h-2.5 rounded bg-amber-400"></span>
+          <span className="text-slate-300">Yielding Robot</span>
         </div>
       </div>
     </div>

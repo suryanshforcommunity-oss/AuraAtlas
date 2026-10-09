@@ -174,6 +174,36 @@ app.post('/api/station/:sid/priority', (req: Request, res: Response) => {
   res.json({ ok });
 });
 
+// Emergency Corridor API Endpoints
+app.post('/api/emergency/preview', (req: Request, res: Response) => {
+  const { robotId, targetX, targetY } = req.body;
+  if (typeof robotId !== 'number' || typeof targetX !== 'number' || typeof targetY !== 'number') {
+    res.status(400).json({ ok: false, error: 'Invalid parameters: robotId, targetX, targetY required' });
+    return;
+  }
+  const result = sim.previewEmergencyCorridor(robotId, [targetX, targetY]);
+  res.json(result);
+});
+
+app.post('/api/emergency/activate', (req: Request, res: Response) => {
+  const { robotId, targetX, targetY } = req.body;
+  if (typeof robotId !== 'number' || typeof targetX !== 'number' || typeof targetY !== 'number') {
+    res.status(400).json({ ok: false, error: 'Invalid parameters: robotId, targetX, targetY required' });
+    return;
+  }
+  const result = sim.activateEmergencyCorridor(robotId, [targetX, targetY]);
+  const state = sim.stateDict();
+  broadcast(state);
+  res.json(result);
+});
+
+app.post('/api/emergency/cancel', (_req: Request, res: Response) => {
+  sim.cancelEmergencyCorridor();
+  const state = sim.stateDict();
+  broadcast(state);
+  res.json({ ok: true });
+});
+
 app.get('/api/map/available', (_req: Request, res: Response) => {
   const files = fs.readdirSync(MAPS_DIR).filter(f => f.endsWith('.map')).map(f => f.replace('.map', ''));
   const benchmarks = [

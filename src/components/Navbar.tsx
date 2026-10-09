@@ -14,7 +14,8 @@ import {
   Home,
   Trash2,
   CheckCircle2,
-  Server
+  Server,
+  Siren
 } from 'lucide-react';
 import { SimulationState } from '../types/fleet';
 
@@ -37,6 +38,7 @@ interface NavbarProps {
   onNavigateTelemetry?: () => void;
   onNavigateAnalytics?: () => void;
   onClearBlocks?: () => void;
+  onOpenEmergencyModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -58,6 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigateTelemetry,
   onNavigateAnalytics,
   onClearBlocks,
+  onOpenEmergencyModal,
 }) => {
   const isRunning = state?.running ?? false;
   const tick = state?.tick ?? 0;
@@ -227,6 +230,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Server className="w-3.5 h-3.5 text-cyan-400" />
             <span className="hidden sm:inline">Architecture</span>
+          </button>
+        )}
+
+        {onOpenEmergencyModal && (
+          <button
+            onClick={onOpenEmergencyModal}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md ${
+              state?.emergency?.active
+                ? 'bg-rose-600 text-white border border-rose-400 shadow-rose-600/30 animate-pulse'
+                : 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30'
+            }`}
+            title="Activate Dynamic Emergency / VVIP Corridor"
+          >
+            <Siren className="w-3.5 h-3.5 text-rose-400" />
+            <span>{state?.emergency?.active ? 'Corridor Active' : 'Emergency Corridor'}</span>
           </button>
         )}
 

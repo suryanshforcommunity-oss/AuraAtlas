@@ -66,6 +66,9 @@ export interface RobotDict {
   battery: number;
   path: [number, number][];
   done: number;
+  isEmergency?: boolean;
+  isYielding?: boolean;
+  isRerouted?: boolean;
 }
 
 export class Robot {
@@ -83,6 +86,9 @@ export class Robot {
   battery: number;
   chargeTarget: [number, number] | null;
   isCharging: boolean;
+  isEmergency: boolean;
+  isYielding: boolean;
+  isRerouted: boolean;
 
   constructor(id: number, start: [number, number], capacity = 1) {
     this.id = id;
@@ -99,6 +105,9 @@ export class Robot {
     this.battery = 100;
     this.chargeTarget = null;
     this.isCharging = false;
+    this.isEmergency = false;
+    this.isYielding = false;
+    this.isRerouted = false;
   }
 
   get pos(): [number, number] {
@@ -322,6 +331,9 @@ export class Robot {
       battery: Math.round(this.battery),
       path: activePath,
       done: this.done,
+      isEmergency: this.isEmergency,
+      isYielding: this.isYielding,
+      isRerouted: this.isRerouted,
     };
   }
 }

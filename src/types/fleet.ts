@@ -23,6 +23,9 @@ export interface RobotData {
   battery: number;
   path: [number, number][];
   done: number;
+  isEmergency?: boolean;
+  isYielding?: boolean;
+  isRerouted?: boolean;
 }
 
 export interface StationData {
@@ -37,7 +40,7 @@ export interface StationData {
 }
 
 export interface HiveMessage {
-  type: 'yield' | 'detour' | 'pickup' | 'delivery' | 'auction' | 'restock' | 'fail' | 'job_finished' | string;
+  type: 'yield' | 'detour' | 'pickup' | 'delivery' | 'auction' | 'restock' | 'fail' | 'job_finished' | 'emergency' | string;
   msg: string;
 }
 
@@ -72,6 +75,30 @@ export interface MetricsData {
   charging?: number;
 }
 
+export type EmergencyStatus =
+  | 'inactive'
+  | 'planning'
+  | 'awaiting_clearance'
+  | 'active'
+  | 'replanning'
+  | 'completed'
+  | 'released'
+  | 'failed';
+
+export interface EmergencyCorridorData {
+  active: boolean;
+  status: EmergencyStatus;
+  robotId: number | null;
+  destination: [number, number] | null;
+  route: [number, number][];
+  reservedCells: [number, number][];
+  intersections: [number, number][];
+  yieldingRobots: number[];
+  reroutedRobots: number[];
+  message?: string;
+  startTick?: number;
+}
+
 export interface SimulationState {
   tick: number;
   running: boolean;
@@ -86,4 +113,5 @@ export interface SimulationState {
   events: string[];
   metrics: MetricsData;
   grid?: GridData;
+  emergency?: EmergencyCorridorData;
 }

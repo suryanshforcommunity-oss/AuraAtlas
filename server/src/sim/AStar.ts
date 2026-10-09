@@ -79,13 +79,20 @@ export function spaceTimeAStar(
   robotId: number,
   startTime = 0,
   maxTime = 250,
-  robots?: any[]
+  robots?: any[],
+  avoidCells?: Set<string>
 ): [number, number][] | null {
   if (start[0] === goal[0] && start[1] === goal[1]) {
     return [[...start]];
   }
 
   const isOccupied = (nx: number, ny: number, nt: number): boolean => {
+    if (avoidCells && avoidCells.has(`${nx},${ny}`)) {
+      if (nx !== start[0] || ny !== start[1]) {
+        return true;
+      }
+    }
+
     if (reservation.isReserved(nx, ny, nt, robotId)) {
       return true;
     }
@@ -237,7 +244,8 @@ export function spaceTimeAStar(
 export function gridAStar(
   grid: Grid,
   start: [number, number],
-  goal: [number, number]
+  goal: [number, number],
+  avoidCells?: Set<string>
 ): [number, number][] | null {
   if (start[0] === goal[0] && start[1] === goal[1]) {
     return [[...start]];
@@ -280,6 +288,12 @@ export function gridAStar(
 
     const nbrs = grid.getNeighbors(x, y);
     for (const [nx, ny] of nbrs) {
+      if (avoidCells && avoidCells.has(`${nx},${ny}`)) {
+        if (nx !== goal[0] || ny !== goal[1]) {
+          continue;
+        }
+      }
+
       const ng = g + 1;
       const nextKey = `${nx},${ny}`;
 
