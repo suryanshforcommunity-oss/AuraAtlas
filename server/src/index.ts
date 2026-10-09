@@ -176,22 +176,34 @@ app.post('/api/station/:sid/priority', (req: Request, res: Response) => {
 
 // Emergency Corridor API Endpoints
 app.post('/api/emergency/preview', (req: Request, res: Response) => {
-  const { robotId, targetX, targetY } = req.body;
-  if (typeof robotId !== 'number' || typeof targetX !== 'number' || typeof targetY !== 'number') {
-    res.status(400).json({ ok: false, error: 'Invalid parameters: robotId, targetX, targetY required' });
+  const { robotId, pickupX, pickupY, dropoffX, dropoffY, targetX, targetY } = req.body;
+  const pX = typeof pickupX === 'number' ? pickupX : targetX;
+  const pY = typeof pickupY === 'number' ? pickupY : targetY;
+  const dX = typeof dropoffX === 'number' ? dropoffX : undefined;
+  const dY = typeof dropoffY === 'number' ? dropoffY : undefined;
+
+  if (typeof robotId !== 'number' || typeof pX !== 'number' || typeof pY !== 'number') {
+    res.status(400).json({ ok: false, error: 'Invalid parameters: robotId, pickupX, pickupY required' });
     return;
   }
-  const result = sim.previewEmergencyCorridor(robotId, [targetX, targetY]);
+  const dropoff = dX !== undefined && dY !== undefined ? [dX, dY] as [number, number] : undefined;
+  const result = sim.previewEmergencyCorridor(robotId, [pX, pY], dropoff);
   res.json(result);
 });
 
 app.post('/api/emergency/activate', (req: Request, res: Response) => {
-  const { robotId, targetX, targetY } = req.body;
-  if (typeof robotId !== 'number' || typeof targetX !== 'number' || typeof targetY !== 'number') {
-    res.status(400).json({ ok: false, error: 'Invalid parameters: robotId, targetX, targetY required' });
+  const { robotId, pickupX, pickupY, dropoffX, dropoffY, targetX, targetY } = req.body;
+  const pX = typeof pickupX === 'number' ? pickupX : targetX;
+  const pY = typeof pickupY === 'number' ? pickupY : targetY;
+  const dX = typeof dropoffX === 'number' ? dropoffX : undefined;
+  const dY = typeof dropoffY === 'number' ? dropoffY : undefined;
+
+  if (typeof robotId !== 'number' || typeof pX !== 'number' || typeof pY !== 'number') {
+    res.status(400).json({ ok: false, error: 'Invalid parameters: robotId, pickupX, pickupY required' });
     return;
   }
-  const result = sim.activateEmergencyCorridor(robotId, [targetX, targetY]);
+  const dropoff = dX !== undefined && dY !== undefined ? [dX, dY] as [number, number] : undefined;
+  const result = sim.activateEmergencyCorridor(robotId, [pX, pY], dropoff);
   const state = sim.stateDict();
   broadcast(state);
   res.json(result);

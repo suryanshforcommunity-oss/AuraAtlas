@@ -137,8 +137,20 @@ export const App: React.FC = () => {
     apiCall(`/api/station/${sid}/refill`, 'POST', { qty, priority });
   };
 
-  const handleActivateEmergency = async (robotId: number, targetX: number, targetY: number) => {
-    return await apiCall('/api/emergency/activate', 'POST', { robotId, targetX, targetY });
+  const handleActivateEmergency = async (
+    robotId: number,
+    pickupX: number,
+    pickupY: number,
+    dropoffX: number,
+    dropoffY: number
+  ) => {
+    return await apiCall('/api/emergency/activate', 'POST', {
+      robotId,
+      pickupX,
+      pickupY,
+      dropoffX,
+      dropoffY,
+    });
   };
 
   const handleCancelEmergency = async () => {

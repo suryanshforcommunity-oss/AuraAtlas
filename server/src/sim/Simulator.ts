@@ -22,7 +22,11 @@ export interface EmergencyCorridorState {
   status: EmergencyStatus;
   robotId: number | null;
   destination: [number, number] | null;
+  pickup: [number, number] | null;
+  dropoff: [number, number] | null;
+  phase: 'to_pickup' | 'to_dropoff' | 'delivered' | null;
   route: [number, number][];
+  fullRoute?: [number, number][];
   reservedCells: [number, number][];
   intersections: [number, number][];
   yieldingRobots: number[];
@@ -75,6 +79,9 @@ export class Simulator {
     status: 'inactive',
     robotId: null,
     destination: null,
+    pickup: null,
+    dropoff: null,
+    phase: null,
     route: [],
     reservedCells: [],
     intersections: [],
@@ -136,74 +143,113 @@ export class Simulator {
     return intersections;
   }
 
-  previewEmergencyCorridor(robotId: number, target: [number, number]): {
+  previewEmergencyCorridor(
+    robotId: number,
+    pickup: [number, number],
+    dropoff?: [number, number]
+  ): {
     ok: boolean;
     route?: [number, number][];
+    fullRoute?: [number, number][];
     reservedCells?: [number, number][];
     intersections?: [number, number][];
     error?: string;
   } {
     const robot = this.robots.find(r => r.id === robotId);
     if (!robot) return { ok: false, error: `Robot ${robotId} not found` };
-    if (!this.grid.isFree(target[0], target[1])) {
-      return { ok: false, error: `Destination (${target[0]},${target[1]}) is blocked by an obstacle` };
+    if (!this.grid.isFree(pickup[0], pickup[1])) {
+      return { ok: false, error: `Pickup location (${pickup[0]},${pickup[1]}) is blocked by an obstacle` };
     }
 
-    const route = gridAStar(this.grid, [robot.x, robot.y], target);
-    if (!route || route.length === 0) {
-      return { ok: false, error: `No obstacle-free route found to (${target[0]},${target[1]})` };
+    // Route 1: Robot to Pickup
+    const path1 = gridAStar(this.grid, [robot.x, robot.y], pickup);
+    if (!path1 || path1.length === 0) {
+      return { ok: false, error: `No obstacle-free route found to Pickup (${pickup[0]},${pickup[1]})` };
     }
 
-    const intersections = this.findIntersections(route);
+    let fullRoute = [...path1];
+
+    // Route 2: Pickup to Dropoff (if dropoff provided)
+    if (dropoff) {
+      if (!this.grid.isFree(dropoff[0], dropoff[1])) {
+        return { ok: false, error: `Dropoff location (${dropoff[0]},${dropoff[1]}) is blocked by an obstacle` };
+      }
+      const path2 = gridAStar(this.grid, pickup, dropoff);
+      if (!path2 || path2.length === 0) {
+        return { ok: false, error: `No obstacle-free route found between Pickup and Dropoff (${dropoff[0]},${dropoff[1]})` };
+      }
+      fullRoute = [...path1, ...path2.slice(1)];
+    }
+
+    const intersections = this.findIntersections(fullRoute);
     return {
       ok: true,
-      route,
-      reservedCells: route,
+      route: path1,
+      fullRoute,
+      reservedCells: fullRoute,
       intersections,
     };
   }
 
-  activateEmergencyCorridor(robotId: number, target: [number, number]): { ok: boolean; error?: string } {
+  activateEmergencyCorridor(
+    robotId: number,
+    pickup: [number, number],
+    dropoff?: [number, number]
+  ): { ok: boolean; error?: string } {
     const robot = this.robots.find(r => r.id === robotId);
     if (!robot) return { ok: false, error: `Robot ${robotId} not found` };
     if (robot.state === State.FAILED) return { ok: false, error: `Robot ${robotId} is in failed state` };
 
-    const route = gridAStar(this.grid, [robot.x, robot.y], target);
-    if (!route || route.length === 0) {
+    const effectiveDropoff = dropoff || pickup;
+
+    // Route 1: Robot -> Pickup
+    const path1 = gridAStar(this.grid, [robot.x, robot.y], pickup);
+    if (!path1 || path1.length === 0) {
       this.emergency = {
         active: false,
         status: 'failed',
         robotId,
-        destination: target,
+        destination: pickup,
+        pickup,
+        dropoff: effectiveDropoff,
+        phase: null,
         route: [],
         reservedCells: [],
         intersections: [],
         yieldingRobots: [],
         reroutedRobots: [],
-        message: 'No safe corridor route found to destination',
+        message: 'No safe corridor route found to pickup',
       };
-      this.events.push(`❌ EMERGENCY CORRIDOR FAILED: No path for R${robotId} to (${target[0]},${target[1]})`);
-      return { ok: false, error: 'No safe route found to destination' };
+      this.events.push(`❌ EMERGENCY CORRIDOR FAILED: No path for R${robotId} to Pickup (${pickup[0]},${pickup[1]})`);
+      return { ok: false, error: 'No safe route found to pickup location' };
     }
 
-    const intersections = this.findIntersections(route);
-    const reservedCells = [...route];
+    // Route 2: Pickup -> Dropoff
+    const path2 = gridAStar(this.grid, pickup, effectiveDropoff);
+    if (!path2 || path2.length === 0) {
+      return { ok: false, error: 'No safe route found from pickup to dropoff location' };
+    }
+
+    const fullRoute = [...path1, ...path2.slice(1)];
+    const intersections = this.findIntersections(fullRoute);
+    const reservedCells = [...fullRoute];
     const reservedSet = new Set(reservedCells.map(c => `${c[0]},${c[1]}`));
 
-    // Reset previous emergency states
+    // Reset previous emergency states & unflag robots
     for (const r of this.robots) {
       r.isEmergency = false;
       r.isYielding = false;
       r.isRerouted = false;
     }
 
-    // Set emergency robot
+    // Set emergency robot properties
     robot.isEmergency = true;
-    robot.path = [...route];
+    robot.path = [...path1];
     robot.pathIdx = 0;
     robot.state = State.MOVING;
     robot.chargeTarget = null;
     robot.isCharging = false;
+    robot.carrying = 0; // Starts empty to collect payload at pickup
 
     // Detect yielding and rerouted normal robots
     const yieldingRobots: number[] = [];
@@ -212,18 +258,15 @@ export class Simulator {
     for (const r of this.robots) {
       if (r.id === robotId || r.state === State.FAILED) continue;
 
-      // Currently occupies a reserved corridor cell -> must yield
       if (reservedSet.has(`${r.x},${r.y}`)) {
         r.isYielding = true;
         yieldingRobots.push(r.id);
       }
 
-      // Planned path crosses the emergency corridor -> reroute
       const pathOverlap = r.path.slice(r.pathIdx).some(p => reservedSet.has(`${p[0]},${p[1]}`));
       if (pathOverlap) {
         r.isRerouted = true;
         reroutedRobots.push(r.id);
-        // Safely replan alternate route avoiding reserved corridor cells
         if (r.task) {
           const altPath = spaceTimeAStar(this.grid, [r.x, r.y], r.task.goal, this.res, r.id, this.tick, 200, this.robots, reservedSet);
           if (altPath && altPath.length > 0) {
@@ -240,24 +283,31 @@ export class Simulator {
       }
     }
 
+    this.jobFinished = false;
+    this.jobFinishedAnnounced = false;
+
     this.emergency = {
       active: true,
       status: 'active',
       robotId,
-      destination: target,
-      route,
+      destination: pickup,
+      pickup,
+      dropoff: effectiveDropoff,
+      phase: 'to_pickup',
+      route: path1,
+      fullRoute,
       reservedCells,
       intersections,
       yieldingRobots,
       reroutedRobots,
       startTick: this.tick,
-      message: `Emergency Corridor Active for Robot ${robotId} (${route.length} cells reserved)`,
+      message: `Emergency Corridor Active: R${robotId} en route to Pickup (${pickup[0]},${pickup[1]}) → Dropoff (${effectiveDropoff[0]},${effectiveDropoff[1]})`,
     };
 
-    this.events.push(`🚨 EMERGENCY CORRIDOR ACTIVATED: R${robotId} → (${target[0]},${target[1]})`);
+    this.events.push(`🚨 EMERGENCY CORRIDOR ACTIVATED: R${robotId} → Pickup (${pickup[0]},${pickup[1]}) → Dropoff (${effectiveDropoff[0]},${effectiveDropoff[1]})`);
     this.hiveMind.unshift({
       type: 'emergency',
-      msg: `🚨 EMERGENCY CORRIDOR: R${robotId} dispatched to (${target[0]},${target[1]}). Swarm yielding.`,
+      msg: `🚨 EMERGENCY ORDER: R${robotId} dispatched to Pickup (${pickup[0]},${pickup[1]}) → Dropoff (${effectiveDropoff[0]},${effectiveDropoff[1]}). Swarm yielding.`,
     });
 
     return { ok: true };
@@ -268,6 +318,7 @@ export class Simulator {
       const robot = this.robots.find(r => r.id === this.emergency.robotId);
       if (robot) {
         robot.isEmergency = false;
+        robot.carrying = 0;
       }
     }
 
@@ -285,6 +336,9 @@ export class Simulator {
       status: 'released',
       robotId: null,
       destination: null,
+      pickup: null,
+      dropoff: null,
+      phase: null,
       route: [],
       reservedCells: [],
       intersections: [],
@@ -353,6 +407,9 @@ export class Simulator {
   }
 
   addOrder(priority = 1, qty = 1): void {
+    this.jobFinished = false;
+    this.jobFinishedAnnounced = false;
+
     const task = this.newTask(priority, qty);
     if (!task) {
       this.events.push('No stock or drop capacity available for new order');
@@ -374,7 +431,6 @@ export class Simulator {
     this.grid.blockCell(x, y);
     this.events.push(`Cell (${x},${y}) blocked`);
 
-    // Check if block affects active emergency corridor
     if (this.emergency.active) {
       const inCorridor = this.emergency.reservedCells.some(c => c[0] === x && c[1] === y);
       if (inCorridor && this.emergency.destination && this.emergency.robotId !== null) {
@@ -543,40 +599,69 @@ export class Simulator {
     const totalPickStock = this.stations.filter(s => s.type === 'pick').reduce((sum, s) => sum + s.current, 0);
     const availablePickStock = this.stations.filter(s => s.type === 'pick').reduce((sum, s) => sum + Math.max(0, s.current - s.reservedPick), 0);
 
+    // Ensure jobFinished is false if pick stock exists
+    if (totalPickStock > 0) {
+      this.jobFinished = false;
+    }
+
     const chargingPads = this.grid.charging_stations && this.grid.charging_stations.length > 0
       ? this.grid.charging_stations
       : autoChargingStations(this.grid, this.robots.length);
 
-    // Dynamic Emergency Corridor Progress & Check
+    // Dynamic Emergency Corridor Progress & Check (2-Phase: Pickup -> Dropoff)
     let emergencyReservedSet = new Set<string>();
     if (this.emergency.active && this.emergency.robotId !== null) {
       const emergRobot = this.robots.find(r => r.id === this.emergency.robotId);
       if (emergRobot) {
-        // Destination Reached Check
-        const dest = this.emergency.destination;
-        if (dest && emergRobot.x === dest[0] && emergRobot.y === dest[1]) {
+        const { pickup, dropoff, phase } = this.emergency;
+
+        // Check Phase 1: Reached Pickup
+        if (phase === 'to_pickup' && pickup && emergRobot.x === pickup[0] && emergRobot.y === pickup[1]) {
+          emergRobot.carrying = 1; // VIP cargo loaded
+          this.emergency.phase = 'to_dropoff';
+          const targetDrop = dropoff || pickup;
+          this.emergency.destination = targetDrop;
+
+          const path2 = gridAStar(this.grid, [emergRobot.x, emergRobot.y], targetDrop);
+          if (path2 && path2.length > 0) {
+            emergRobot.path = path2;
+            emergRobot.pathIdx = 0;
+            this.emergency.route = path2;
+            this.emergency.reservedCells = path2;
+            this.emergency.intersections = this.findIntersections(path2);
+            this.events.push(`🚨 Emergency R${emergRobot.id} loaded VIP cargo at Pickup (${pickup[0]},${pickup[1]}). In transit to Dropoff (${targetDrop[0]},${targetDrop[1]}).`);
+            newHive.push({
+              type: 'emergency',
+              msg: `🚨 Emergency R${emergRobot.id} loaded VIP cargo. En route to Dropoff (${targetDrop[0]},${targetDrop[1]}).`,
+            });
+          }
+        }
+        // Check Phase 2: Reached Dropoff
+        else if (phase === 'to_dropoff' && dropoff && emergRobot.x === dropoff[0] && emergRobot.y === dropoff[1]) {
           this.emergency.status = 'completed';
+          this.emergency.phase = 'delivered';
           this.emergency.active = false;
           this.emergency.reservedCells = [];
           this.emergency.yieldingRobots = [];
           this.emergency.reroutedRobots = [];
           emergRobot.isEmergency = false;
-          this.events.push(`✅ EMERGENCY DELIVERY COMPLETED: Robot ${emergRobot.id} arrived at destination!`);
+          emergRobot.carrying = 0;
+          emergRobot.done++;
+          this.events.push(`✅ EMERGENCY DELIVERY COMPLETED: Robot ${emergRobot.id} delivered VIP payload to Dropoff (${dropoff[0]},${dropoff[1]})!`);
           newHive.push({
             type: 'emergency',
-            msg: `✅ Emergency delivery completed by R${emergRobot.id}. Corridor released.`,
+            msg: `✅ Emergency VIP delivery completed by R${emergRobot.id}. Corridor released.`,
           });
 
-          // Clear flags for normal robots
           for (const r of this.robots) {
             r.isYielding = false;
             r.isRerouted = false;
           }
-        } else {
-          // Dynamic Cell Release: Remove past cells behind emergency robot
+        }
+        // Standard In-Transit Updates
+        else {
           if (emergRobot.path && emergRobot.path.length > 0) {
             const currentIdx = Math.max(0, emergRobot.pathIdx);
-            // Keep current cell + future cells reserved
             const remainingRoute = emergRobot.path.slice(currentIdx);
             this.emergency.reservedCells = remainingRoute;
           }
@@ -585,9 +670,10 @@ export class Simulator {
           // Check if corridor route ahead is blocked
           const remainingPath = emergRobot.path.slice(emergRobot.pathIdx);
           const isBlocked = remainingPath.some(c => !this.grid.isFree(c[0], c[1]));
-          if (isBlocked && dest) {
+          const currentDest = this.emergency.destination;
+          if (isBlocked && currentDest) {
             this.emergency.status = 'replanning';
-            const newRoute = gridAStar(this.grid, [emergRobot.x, emergRobot.y], dest);
+            const newRoute = gridAStar(this.grid, [emergRobot.x, emergRobot.y], currentDest);
             if (newRoute && newRoute.length > 0) {
               emergRobot.path = newRoute;
               emergRobot.pathIdx = 0;
@@ -631,7 +717,7 @@ export class Simulator {
       }
     }
 
-    // Battery Check: Low Battery (< 15%) protection (bypass emergency robot)
+    // Battery Check: Low Battery (< 15%) protection
     for (const r of this.robots) {
       if (!r.isEmergency && r.state !== State.FAILED && !r.isCharging && !r.chargeTarget && r.battery < 15) {
         if (r.task) {
@@ -653,13 +739,13 @@ export class Simulator {
       }
     }
 
-    // Priority Dispatch: High priority pick stations get multiple orders allocated
+    // Priority Dispatch
     const highPriorityPick = this.stations.find(s => s.type === 'pick' && s.priority >= 2 && (s.current - s.reservedPick) > 0);
     if (highPriorityPick && this.tick % 4 === 0) {
       this.addOrder(highPriorityPick.priority, this.robotCapacity);
     }
 
-    // Assign pending tasks to newly-idle robots if stock available & battery >= 15%
+    // Assign pending tasks to newly-idle robots
     for (const r of this.robots) {
       if (!r.isEmergency && r.task === null && r.state === State.IDLE && !r.isCharging && !r.chargeTarget && r.battery >= 15 && this.pending.length > 0) {
         const task = this.pending.shift()!;
@@ -681,9 +767,9 @@ export class Simulator {
       this.addOrder(1, this.robotCapacity);
     }
 
-    // JOB FINISHED / Charging Dispatch Check
+    // JOB FINISHED: Only trigger when total pick stock is genuinely 0 and all deliveries are done
     const activeTasks = this.robots.some(r => r.task !== null || r.carrying > 0 || r.isEmergency);
-    if ((totalPickStock === 0 || availablePickStock === 0) && this.pending.length === 0 && !activeTasks) {
+    if (totalPickStock === 0 && this.pending.length === 0 && !activeTasks && this.tick > 5) {
       this.jobFinished = true;
       if (!this.jobFinishedAnnounced) {
         this.jobFinishedAnnounced = true;
@@ -700,7 +786,7 @@ export class Simulator {
       if (r.isEmergency) return;
       const pad = chargingPads[idx % chargingPads.length];
       const atPad = r.x === pad[0] && r.y === pad[1];
-      if (atPad && !r.task && (this.jobFinished || availablePickStock === 0)) {
+      if (atPad && !r.task && (this.jobFinished || totalPickStock === 0)) {
         r.isCharging = true;
         r.chargeTarget = [...pad];
         r.path = [];
@@ -711,7 +797,7 @@ export class Simulator {
         !r.chargeTarget &&
         r.task === null &&
         r.carrying === 0 &&
-        (this.jobFinished || availablePickStock === 0)
+        (this.jobFinished || totalPickStock === 0)
       ) {
         r.navigateToCharge(pad, this.grid, this.res, this.tick, this.robots);
         this.events.push(`Robot ${r.id} navigating to Charging Station (${pad[0]},${pad[1]})`);
@@ -776,7 +862,7 @@ export class Simulator {
           });
           this.events.push(`Robot ${r.id} completed Task ${prev.id} (${duration} ticks)`);
 
-          const remPickStock = this.stations.filter(s => s.type === 'pick').reduce((sum, s) => sum + Math.max(0, s.current - s.reservedPick), 0);
+          const remPickStock = this.stations.filter(s => s.type === 'pick').reduce((sum, s) => sum + s.current, 0);
           if (remPickStock === 0 || this.jobFinished) {
             const pad = chargingPads[r.id % chargingPads.length];
             if (r.x === pad[0] && r.y === pad[1]) {
@@ -875,6 +961,8 @@ export class Simulator {
     this.pending = [];
     this.res.clear();
     this.perf.reset();
+    this.jobFinished = false;
+    this.jobFinishedAnnounced = false;
     this.cancelEmergencyCorridor();
     Station.resetCounter();
     Task.resetCounter();

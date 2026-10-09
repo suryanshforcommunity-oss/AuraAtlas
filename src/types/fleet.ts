@@ -90,7 +90,11 @@ export interface EmergencyCorridorData {
   status: EmergencyStatus;
   robotId: number | null;
   destination: [number, number] | null;
+  pickup?: [number, number] | null;
+  dropoff?: [number, number] | null;
+  phase?: 'to_pickup' | 'to_dropoff' | 'delivered' | null;
   route: [number, number][];
+  fullRoute?: [number, number][];
   reservedCells: [number, number][];
   intersections: [number, number][];
   yieldingRobots: number[];

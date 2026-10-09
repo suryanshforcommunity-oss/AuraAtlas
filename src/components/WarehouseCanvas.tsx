@@ -12,7 +12,8 @@ import {
   XCircle,
   ShieldAlert,
   ArrowRight,
-  Route
+  Route,
+  X
 } from 'lucide-react';
 
 interface WarehouseCanvasProps {
@@ -45,6 +46,22 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [cellSize, setCellSize] = useState<number>(24);
+  const [jobDismissed, setJobDismissed] = useState<boolean>(false);
+  const prevJobFinishedRef = useRef<boolean>(false);
+
+  // Auto-dismiss Job Finished banner after 6 seconds
+  useEffect(() => {
+    if (state?.job_finished && !prevJobFinishedRef.current) {
+      setJobDismissed(false);
+      const timer = setTimeout(() => {
+        setJobDismissed(true);
+      }, 6000);
+      return () => clearTimeout(timer);
+    } else if (!state?.job_finished) {
+      setJobDismissed(false);
+    }
+    prevJobFinishedRef.current = !!state?.job_finished;
+  }, [state?.job_finished]);
 
   const grid: GridData | undefined = state?.grid;
   const emergency = state?.emergency;
@@ -177,38 +194,88 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       }
     }
 
-    // 4. Emergency Destination Marker (Pulsing Red Beacon)
-    if (emergency && emergency.active && emergency.destination) {
-      const [dx, dy] = emergency.destination;
-      const dcx = dx * CELL + CELL / 2;
-      const dcy = dy * CELL + CELL / 2;
+    // 4. Emergency Phase Markers: VIP Pickup (Emerald) and VIP Dropoff (Red)
+    if (emergency && emergency.active) {
       const now = Date.now();
       const beaconRadius = Math.max(CELL * 0.6, 8) + (Math.sin(now * 0.008) + 1) * (CELL * 0.2);
 
-      // Outer Beacon Ring
-      ctx.beginPath();
-      ctx.arc(dcx, dcy, beaconRadius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
-      ctx.fill();
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      // 4a. VIP Pickup Marker
+      if (emergency.pickup) {
+        const [px, py] = emergency.pickup;
+        const pcx = px * CELL + CELL / 2;
+        const pcy = py * CELL + CELL / 2;
+        const isToPickup = emergency.phase === 'to_pickup';
 
-      // Inner Target Crosshair
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(dcx - CELL * 0.35, dcy);
-      ctx.lineTo(dcx + CELL * 0.35, dcy);
-      ctx.moveTo(dcx, dcy - CELL * 0.35);
-      ctx.lineTo(dcx, dcy + CELL * 0.35);
-      ctx.stroke();
+        if (isToPickup) {
+          // Active pickup beacon (pulsing emerald)
+          ctx.beginPath();
+          ctx.arc(pcx, pcy, beaconRadius, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
+          ctx.fill();
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 2;
+          ctx.stroke();
 
-      if (CELL > 14) {
-        ctx.fillStyle = '#ef4444';
-        ctx.font = `bold ${Math.max(CELL * 0.32, 8)}px JetBrains Mono, monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText('DEST', dcx, dcy - beaconRadius - 3);
+          // Inner crosshair
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(pcx - CELL * 0.35, pcy);
+          ctx.lineTo(pcx + CELL * 0.35, pcy);
+          ctx.moveTo(pcx, pcy - CELL * 0.35);
+          ctx.lineTo(pcx, pcy + CELL * 0.35);
+          ctx.stroke();
+
+          if (CELL > 13) {
+            ctx.fillStyle = '#10b981';
+            ctx.font = `bold ${Math.max(CELL * 0.3, 8)}px JetBrains Mono, monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText('PICKUP', pcx, pcy - beaconRadius - 3);
+          }
+        } else {
+          // Pickup fulfilled badge
+          ctx.beginPath();
+          ctx.arc(pcx, pcy, CELL * 0.45, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
+          ctx.fill();
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
+
+      // 4b. VIP Dropoff / Destination Marker
+      const dropCoords = emergency.dropoff || emergency.destination;
+      if (dropCoords) {
+        const [dx, dy] = dropCoords;
+        const dcx = dx * CELL + CELL / 2;
+        const dcy = dy * CELL + CELL / 2;
+
+        // Outer Beacon Ring
+        ctx.beginPath();
+        ctx.arc(dcx, dcy, beaconRadius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+        ctx.fill();
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Inner Target Crosshair
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(dcx - CELL * 0.35, dcy);
+        ctx.lineTo(dcx + CELL * 0.35, dcy);
+        ctx.moveTo(dcx, dcy - CELL * 0.35);
+        ctx.lineTo(dcx, dcy + CELL * 0.35);
+        ctx.stroke();
+
+        if (CELL > 13) {
+          ctx.fillStyle = '#ef4444';
+          ctx.font = `bold ${Math.max(CELL * 0.3, 8)}px JetBrains Mono, monospace`;
+          ctx.textAlign = 'center';
+          ctx.fillText('DROPOFF', dcx, dcy - beaconRadius - 3);
+        }
       }
     }
 
@@ -609,11 +676,18 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* JOB FINISHED Notification Banner */}
-      {state?.job_finished && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-semibold backdrop-blur-xl shadow-2xl shadow-emerald-500/20 animate-bounce">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+      {/* JOB FINISHED Notification Banner with Auto-Dismiss & Close Button */}
+      {state?.job_finished && !jobDismissed && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-semibold backdrop-blur-xl shadow-2xl shadow-emerald-500/20 animate-fade-in transition-all">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>🎉 JOB FINISHED! All items delivered. Robots parked at Charging Stations.</span>
+          <button
+            onClick={() => setJobDismissed(true)}
+            className="ml-2 p-1 rounded-full hover:bg-emerald-500/30 text-emerald-300 hover:text-white transition-colors"
+            title="Dismiss notification"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
