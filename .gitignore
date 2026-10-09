@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production build outputs
+dist/
+build/
+
+# Environment and virtualenvs
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.venv/
+env/
+venv/
+ENV/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# OS generated
+.DS_Store
+Thumbs.db
