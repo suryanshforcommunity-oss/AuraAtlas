@@ -30,6 +30,18 @@ import {
 } from 'lucide-react';
 
 import LuminousType from './LuminousType';
+import LogoLoop, { LogoItem } from './LogoLoop';
+import {
+  SiReact,
+  SiTypescript,
+  SiNodedotjs,
+  SiVite,
+  SiTailwindcss,
+  SiExpress,
+  SiSocketdotio,
+  SiHtml5,
+  SiWebgl
+} from 'react-icons/si';
 
 interface LandingPageProps {
   onLaunchSimulator: () => void;
@@ -100,6 +112,99 @@ const BENCHMARK_CARDS: BenchmarkCard[] = [
     dim: '32 × 32 Open Floor',
     desc: 'Clear open grid space for maximum speed swarm velocity testing.',
     icon: <GridIcon className="w-5 h-5 text-emerald-400" />,
+  },
+];
+
+const TECH_STACK_LOGOS: LogoItem[] = [
+  {
+    node: (
+      <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#0e131f]/90 border border-slate-800 text-slate-200 hover:border-cyan-400/60 hover:text-cyan-300 transition-all shadow-lg backdrop-blur group">
+        <SiReact className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
+        <span className="font-mono text-xs font-semibold tracking-wider">React 18</span>
+      </div>
+    ),
+    title: 'React 18',
+    href: 'https://react.dev'
+  },
+  {
+    node: (
+      <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#0e131f]/90 border border-slate-800 text-slate-200 hover:border-blue-400/60 hover:text-blue-300 transition-all shadow-lg backdrop-blur group">
+        <SiTypescript className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+        <span className="font-mono text-xs font-semibold tracking-wider">TypeScript 5</span>
+      </div>
+    ),
+    title: 'TypeScript',
+    href: 'https://www.typescriptlang.org'
+  },
+  {
+    node: (
+      <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#0e131f]/90 border border-slate-800 text-slate-200 hover:border-emerald-400/60 hover:text-emerald-300 transition-all shadow-lg backdrop-blur group">
+        <SiNodedotjs className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+        <span className="font-mono text-xs font-semibold tracking-wider">Node.js Engine</span>
+      </div>
+    ),
+    title: 'Node.js',
+    href: 'https://nodejs.org'
+  },
+  {
+    node: (
+      <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#0e131f]/90 border border-slate-800 text-slate-200 hover:border-purple-400/60 hover:text-purple-300 transition-all shadow-lg backdrop-blur group">
+        <SiVite className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
+        <span className="font-mono text-xs font-semibold tracking-wider">Vite Bundler</span>
+      </div>
+    ),
+    title: 'Vite',
+    href: 'https://vitejs.dev'
+  },
+  {
+    node: (
+      <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#0e131f]/90 border border-slate-800 text-slate-200 hover:border-cyan-400/60 hover:text-cyan-300 transition-all shadow-lg backdrop-blur group">
+        <SiTailwindcss className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
+        <span className="font-mono text-xs font-semibold tracking-wider">Tailwind CSS</span>
+      </div>
+    ),
+    title: 'Tailwind CSS',
+    href: 'https://tailwindcss.com'
+  },
+  {
+    node: (
+      <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#0e131f]/90 border border-slate-800 text-slate-200 hover:border-slate-400/60 hover:text-white transition-all shadow-lg backdrop-blur group">
+        <SiExpress className="w-5 h-5 text-slate-300 group-hover:scale-110 transition-transform" />
+        <span className="font-mono text-xs font-semibold tracking-wider">Express REST</span>
+      </div>
+    ),
+    title: 'Express REST API',
+    href: 'https://expressjs.com'
+  },
+  {
+    node: (
+      <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#0e131f]/90 border border-slate-800 text-slate-200 hover:border-rose-400/60 hover:text-rose-300 transition-all shadow-lg backdrop-blur group">
+        <SiSocketdotio className="w-5 h-5 text-rose-400 group-hover:scale-110 transition-transform" />
+        <span className="font-mono text-xs font-semibold tracking-wider">WebSockets Sub-MS</span>
+      </div>
+    ),
+    title: 'WebSockets Streaming',
+    href: 'https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API'
+  },
+  {
+    node: (
+      <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#0e131f]/90 border border-slate-800 text-slate-200 hover:border-orange-400/60 hover:text-orange-300 transition-all shadow-lg backdrop-blur group">
+        <SiHtml5 className="w-5 h-5 text-orange-400 group-hover:scale-110 transition-transform" />
+        <span className="font-mono text-xs font-semibold tracking-wider">Canvas 2D Simulator</span>
+      </div>
+    ),
+    title: 'Canvas 2D Simulator',
+    href: 'https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API'
+  },
+  {
+    node: (
+      <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#0e131f]/90 border border-slate-800 text-slate-200 hover:border-indigo-400/60 hover:text-indigo-300 transition-all shadow-lg backdrop-blur group">
+        <SiWebgl className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
+        <span className="font-mono text-xs font-semibold tracking-wider">WebGL & OGL</span>
+      </div>
+    ),
+    title: 'WebGL / OGL Shaders',
+    href: 'https://www.khronos.org/webgl/'
   },
 ];
 
@@ -262,6 +367,39 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             </div>
           </div>
+        </section>
+
+        {/* TECHNOLOGY STACK & CORE INFRASTRUCTURE LOOP (React Bits LogoLoop) */}
+        <section className="py-10 border-y border-slate-800/80 bg-black/70 backdrop-blur-md relative overflow-hidden">
+          <div className="max-w-7xl mx-auto px-6 mb-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+            <div>
+              <div className="flex items-center justify-center sm:justify-start gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span className="text-[11px] font-mono tracking-widest text-cyan-400 uppercase font-bold">
+                  CORE TECHNOLOGIES & DISTRIBUTED STACK
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                Engineered with modern reactive frameworks, sub-millisecond sockets & 60fps simulation canvas
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-[#0e131f] border border-slate-800 text-slate-400">
+              Interactive • Hover to Pause
+            </span>
+          </div>
+
+          <LogoLoop
+            logos={TECH_STACK_LOGOS}
+            speed={65}
+            direction="left"
+            logoHeight={44}
+            gap={20}
+            hoverSpeed={0}
+            scaleOnHover={true}
+            fadeOut={true}
+            fadeOutColor="#000000"
+            ariaLabel="FleetSync Technology Stack & Languages"
+          />
         </section>
 
         {/* FEATURE BENTO GRID SECTION */}
