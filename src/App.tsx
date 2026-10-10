@@ -11,10 +11,12 @@ import { LandingPage } from './components/LandingPage';
 import { TelemetryPage } from './components/TelemetryPage';
 import { AnalyticsPage } from './components/AnalyticsPage';
 import { SimulationState } from './types/fleet';
+import { createDefaultSimulationState, stepClientSimulation } from './sim/clientSimulation';
 
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'landing' | 'map' | 'telemetry' | 'analytics'>('landing');
-  const [simState, setSimState] = useState<SimulationState | null>(null);
+  // Initialize with rich simulation state so it never starts empty
+  const [simState, setSimState] = useState<SimulationState>(createDefaultSimulationState());
   const [connected, setConnected] = useState<boolean>(false);
 
   const [heatOn, setHeatOn] = useState<boolean>(false);
@@ -27,97 +29,190 @@ export const App: React.FC = () => {
   const [isEdgeModalOpen, setIsEdgeModalOpen] = useState<boolean>(false);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Connect WebSocket
   const connectWS = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws`;
+    // If user configured remote WS via env
+    const customWsUrl = import.meta.env.VITE_WS_URL;
+    let wsUrl: string;
 
-    const socket = new WebSocket(wsUrl);
+    if (customWsUrl) {
+      wsUrl = customWsUrl;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      // In local dev, Vite proxies /ws to localhost:5000
+      wsUrl = `${protocol}//${host}/ws`;
+    }
 
-    socket.onopen = () => {
-      setConnected(true);
-    };
+    try {
+      const socket = new WebSocket(wsUrl);
 
-    socket.onmessage = event => {
-      try {
-        const data: SimulationState = JSON.parse(event.data);
-        setSimState(prev => ({
-          ...data,
-          grid: data.grid || prev?.grid,
-        }));
-      } catch (err) {
-        console.error('Failed to parse WebSocket state:', err);
-      }
-    };
+      socket.onopen = () => {
+        setConnected(true);
+      };
 
-    socket.onclose = () => {
+      socket.onmessage = event => {
+        try {
+          const data: SimulationState = JSON.parse(event.data);
+          setSimState(prev => ({
+            ...data,
+            grid: data.grid || prev.grid,
+          }));
+        } catch (err) {
+          console.error('Failed to parse WebSocket state:', err);
+        }
+      };
+
+      socket.onclose = () => {
+        setConnected(false);
+        // Exponential/gentle reconnect attempts
+        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = setTimeout(connectWS, 4000);
+      };
+
+      socket.onerror = () => {
+        socket.close();
+      };
+
+      wsRef.current = socket;
+    } catch {
       setConnected(false);
-      setTimeout(connectWS, 1500);
-    };
-
-    socket.onerror = err => {
-      console.error('WebSocket error:', err);
-      socket.close();
-    };
-
-    wsRef.current = socket;
+    }
   }, []);
 
   useEffect(() => {
     connectWS();
     return () => {
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       wsRef.current?.close();
     };
   }, [connectWS]);
 
+  // Client-side simulation runner (active when disconnected & sim is running)
+  useEffect(() => {
+    if (connected) return; // Server handles ticks when connected
+
+    let timer: NodeJS.Timeout;
+    if (simState.running) {
+      timer = setInterval(() => {
+        setSimState(prev => stepClientSimulation(prev));
+      }, 750);
+    }
+    return () => clearInterval(timer);
+  }, [connected, simState.running]);
+
   // REST API Helpers
   const apiCall = async (url: string, method = 'POST', body: any = null) => {
+    const apiBase = import.meta.env.VITE_API_URL || '';
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${apiBase}${url}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: body ? JSON.stringify(body) : null,
       });
       return await res.json();
     } catch (err) {
-      console.error(`API Call ${url} failed:`, err);
-      throw err;
+      // In standalone client demo mode, graceful fallback
+      return null;
     }
   };
 
   // Handlers
   const handleToggleStart = () => {
-    if (simState?.running) {
-      apiCall('/api/control/pause');
+    if (connected) {
+      if (simState.running) {
+        apiCall('/api/control/pause');
+      } else {
+        apiCall('/api/control/start');
+      }
     } else {
-      apiCall('/api/control/start');
+      setSimState(prev => ({ ...prev, running: !prev.running }));
     }
   };
 
   const handleStep = () => {
-    apiCall('/api/control/step');
+    if (connected) {
+      apiCall('/api/control/step');
+    } else {
+      setSimState(prev => stepClientSimulation(prev));
+    }
   };
 
   const handleReset = () => {
-    apiCall('/api/control/reset');
+    if (connected) {
+      apiCall('/api/control/reset');
+    } else {
+      setSimState(createDefaultSimulationState());
+    }
   };
 
   const handleBlockCell = (x: number, y: number) => {
-    apiCall('/api/event/block', 'POST', { x, y });
+    if (connected) {
+      apiCall('/api/event/block', 'POST', { x, y });
+    } else {
+      setSimState(prev => {
+        if (!prev.grid) return prev;
+        const newCells = prev.grid.cells.map((row, ry) =>
+          row.map((val, rx) => (rx === x && ry === y ? (val === 1 ? 0 : 1) : val))
+        );
+        return {
+          ...prev,
+          grid: { ...prev.grid, cells: newCells },
+          events: [
+            `[${new Date().toLocaleTimeString()}] Obstacle toggled at (${x}, ${y})`,
+            ...prev.events.slice(0, 30),
+          ],
+        };
+      });
+    }
   };
 
   const handleFailRobot = (rid: number) => {
-    apiCall(`/api/event/fail/${rid}`, 'POST');
+    if (connected) {
+      apiCall(`/api/event/fail/${rid}`, 'POST');
+    } else {
+      setSimState(prev => {
+        const robots = prev.robots.map(r =>
+          r.id === rid ? { ...r, state: r.state === 'failed' ? 'idle' : 'failed' } : r
+        );
+        return {
+          ...prev,
+          robots,
+          hive_mind: [
+            { type: 'fail', msg: `Robot #${rid} manual fault toggled.` },
+            ...prev.hive_mind,
+          ],
+        };
+      });
+    }
   };
 
   const handleSetStationPriority = (sid: number, priority: number) => {
-    apiCall(`/api/station/${sid}/priority`, 'POST', { priority });
+    if (connected) {
+      apiCall(`/api/station/${sid}/priority`, 'POST', { priority });
+    } else {
+      setSimState(prev => ({
+        ...prev,
+        stations: prev.stations.map(s => (s.id === sid ? { ...s, priority } : s)),
+      }));
+    }
   };
 
   const handleDispatchOrder = (priority: number, qty: number) => {
-    apiCall('/api/event/order', 'POST', { priority, qty });
+    if (connected) {
+      apiCall('/api/event/order', 'POST', { priority, qty });
+    } else {
+      setSimState(prev => ({
+        ...prev,
+        total_pick_stock: (prev.total_pick_stock ?? 150) + qty,
+        hive_mind: [
+          { type: 'restock', msg: `Order Dispatched: ${qty} units allocated (Priority ${priority})` },
+          ...prev.hive_mind,
+        ],
+      }));
+    }
   };
 
   const handleDownloadMap = async (mapName: string) => {
@@ -133,11 +228,24 @@ export const App: React.FC = () => {
   };
 
   const handleClearBlocks = () => {
-    apiCall('/api/event/clear-blocks');
+    if (connected) {
+      apiCall('/api/event/clear-blocks');
+    } else {
+      setSimState(createDefaultSimulationState());
+    }
   };
 
   const handleRefillStation = (sid: number, qty: number, priority?: number) => {
-    apiCall(`/api/station/${sid}/refill`, 'POST', { qty, priority });
+    if (connected) {
+      apiCall(`/api/station/${sid}/refill`, 'POST', { qty, priority });
+    } else {
+      setSimState(prev => ({
+        ...prev,
+        stations: prev.stations.map(s =>
+          s.id === sid ? { ...s, current: Math.min(s.max, s.current + qty), priority: priority ?? s.priority } : s
+        ),
+      }));
+    }
   };
 
   const handleActivateEmergency = async (
@@ -147,17 +255,68 @@ export const App: React.FC = () => {
     dropoffX: number,
     dropoffY: number
   ) => {
-    return await apiCall('/api/emergency/activate', 'POST', {
-      robotId,
-      pickupX,
-      pickupY,
-      dropoffX,
-      dropoffY,
-    });
+    if (connected) {
+      return await apiCall('/api/emergency/activate', 'POST', {
+        robotId,
+        pickupX,
+        pickupY,
+        dropoffX,
+        dropoffY,
+      });
+    } else {
+      setSimState(prev => {
+        const route: [number, number][] = [
+          [pickupX, pickupY],
+          [Math.floor((pickupX + dropoffX) / 2), pickupY],
+          [Math.floor((pickupX + dropoffX) / 2), dropoffY],
+          [dropoffX, dropoffY],
+        ];
+        return {
+          ...prev,
+          emergency: {
+            active: true,
+            status: 'active',
+            robotId,
+            destination: [dropoffX, dropoffY],
+            pickup: [pickupX, pickupY],
+            dropoff: [dropoffX, dropoffY],
+            route,
+            reservedCells: route,
+            intersections: [],
+            yieldingRobots: prev.robots.filter(r => r.id !== robotId).map(r => r.id),
+            reroutedRobots: [],
+            message: `Emergency Corridor activated for Robot #${robotId}`,
+          },
+          hive_mind: [
+            { type: 'emergency', msg: `VIP EMERGENCY CORRIDOR ACTIVE: Robot #${robotId} prioritized!` },
+            ...prev.hive_mind,
+          ],
+        };
+      });
+      return { ok: true };
+    }
   };
 
   const handleCancelEmergency = async () => {
-    return await apiCall('/api/emergency/cancel', 'POST');
+    if (connected) {
+      return await apiCall('/api/emergency/cancel', 'POST');
+    } else {
+      setSimState(prev => ({
+        ...prev,
+        emergency: {
+          active: false,
+          status: 'inactive',
+          robotId: null,
+          destination: null,
+          route: [],
+          reservedCells: [],
+          intersections: [],
+          yieldingRobots: [],
+          reroutedRobots: [],
+        },
+      }));
+      return { ok: true };
+    }
   };
 
   const handleSelectBenchmarkFromLanding = async (mapName: string) => {

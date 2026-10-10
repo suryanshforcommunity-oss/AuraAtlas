@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AURA EdgeAI — Mission Control</title>
+<style>
+:root{--bg:#f5f7f2;--card:#fff;--ink:#263b31;--muted:#718078;--green:#477c69;--sage:#deebe2;--blue:#e0e9f8;--amber:#f4e2bf;--red:#c95f58;--line:#e2e8e1}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.45 Inter,Segoe UI,Arial,sans-serif;color:var(--ink)}header{padding:20px 26px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:#ffffffb8}h1{margin:0;font-size:22px;letter-spacing:-.5px}h2{font-size:15px;margin:0 0 12px}p{margin:5px 0;color:var(--muted)}main{max-width:1400px;margin:auto;padding:22px;display:grid;gap:16px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.card,.stat{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:16px;box-shadow:0 4px 16px #233b2d08}.stat small{color:var(--muted)}.stat strong{display:block;font-size:25px;margin-top:5px}.layout{display:grid;grid-template-columns:minmax(300px,1.45fr) minmax(280px,1fr);gap:16px}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;max-width:600px}.cell{aspect-ratio:1;border:1px solid #e6ebe4;border-radius:4px;background:#fbfcf9;position:relative;cursor:pointer;min-width:0}.cell.obstacle{background:#6c7971;border-color:#6c7971}.cell.robot{background:#cce5d5;border:2px solid var(--green)}.cell.route{box-shadow:inset 0 0 0 2px #8eb9a0}.cell.task{background:var(--amber)}.cell span{font-size:10px;font-weight:700}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.btn{border:0;border-radius:9px;padding:10px 13px;background:var(--green);color:white;cursor:pointer;font-weight:650}.btn.secondary{background:var(--sage);color:var(--ink)}.btn.warn{background:#f6e6c8;color:#674d22}.status{display:inline-block;padding:4px 8px;border-radius:20px;background:var(--sage);font-size:12px;font-weight:700}.status.off{background:var(--amber)}.list{display:grid;gap:8px}.item{padding:10px;border:1px solid var(--line);border-radius:10px}.item strong{margin-right:6px}.muted{color:var(--muted)}.logs{max-height:210px;overflow:auto;font-size:12px}.log{padding:7px 0;border-bottom:1px solid var(--line)}.foot{font-size:12px;color:var(--muted)}@media(max-width:800px){.layout{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}main{padding:12px}header{padding:16px}}
+</style></head>
+<body>
+<header><div><h1>AURA EdgeAI <span style="color:var(--green)">/</span> Mission Control</h1><p>Local warehouse robot decisions · standalone simulation</p></div><span class="status" id="mode">LOCAL RULE ENGINE</span></header>
+<main>
+<div class="stats">
+<div class="stat"><small>Tasks completed</small><strong id="completed">0</strong></div>
+<div class="stat"><small>Active robots</small><strong id="active">4</strong></div>
+<div class="stat"><small>Inference latency</small><strong id="latency">— ms</strong></div>
+<div class="stat"><small>Reroutes</small><strong id="reroutes">0</strong></div>
+</div>
+<div class="layout">
+<section class="card"><h2>Warehouse grid <span class="muted" style="font-weight:400">· click a cell to toggle obstacle</span></h2><div class="toolbar"><button class="btn" onclick="step()">Advance simulation</button><button class="btn secondary" onclick="toggleOffline()">Toggle simulated offline mode</button><button class="btn secondary" onclick="resetSim()">Reset</button></div><div id="grid" class="grid"></div><p class="foot">Robot cells: green · obstacles: dark gray · pickup/delivery cells: amber · route cells: outlined green.</p></section>
+<div style="display:grid;gap:16px;align-content:start">
+<section class="card"><h2>Edge decision engine</h2><div id="edgeDetails" class="list"></div></section>
+<section class="card"><h2>Fleet & tasks</h2><div id="fleet" class="list"></div></section>
+<section class="card"><h2>Recent events</h2><div id="logs" class="logs"></div></section>
+</div></div>
+<section class="card"><h2>Decision transparency</h2><p id="explain">Advance the simulation to see why tasks are assigned.</p><p class="foot">This demo uses deterministic local rules; it does not claim a trained ML model is present. Offline mode simulates cloud unavailability—the app does not use cloud inference.</p></section>
+</main>
+<script>
+const API='';
+let current=null, edge=null;
+async function request(path,opts={}){const r=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts});if(!r.ok)throw new Error(await r.text());return r.json()}
+async function refresh(){try{[current,edge]=await Promise.all([request('/state'),request('/edge/status')]);render()}catch(e){document.getElementById('explain').textContent='Backend not connected. Start the FastAPI server, then refresh this page.'}}
+function render(){if(!current)return;
+document.getElementById('completed').textContent=current.metrics.tasks_completed;
+document.getElementById('active').textContent=current.robots.filter(r=>r.status!=='failed').length;
+document.getElementById('latency').textContent=(edge.last_latency_ms||0).toFixed(2)+' ms';
+document.getElementById('reroutes').textContent=current.metrics.reroutes;
+document.getElementById('mode').textContent=edge.mode+(current.offline_simulated?' · OFFLINE':'');
+document.getElementById('mode').className='status'+(current.offline_simulated?' off':'');
+const grid=document.getElementById('grid');grid.innerHTML='';
+const obstacles=new Set(current.obstacles.map(p=>p.join(','))), robots=new Map(current.robots.map(r=>[r.position.join(','),r])), routes=new Set(current.robots.flatMap(r=>r.route.map(p=>p.join(','))));
+const taskCells=new Set(current.tasks.filter(t=>t.status!=='completed').flatMap(t=>[t.pickup,t.delivery]).map(p=>p.join(',')));
+for(let y=0;y<current.height;y++)for(let x=0;x<current.width;x++){let key=x+','+y,c=document.createElement('button');c.className='cell';c.title=`(${x}, ${y})`;if(obstacles.has(key))c.classList.add('obstacle');if(routes.has(key))c.classList.add('route');if(taskCells.has(key))c.classList.add('task');if(robots.has(key)){c.classList.add('robot');c.innerHTML='<span>'+robots.get(key).id+'</span>';if(robots.get(key).status==='failed')c.style.background='#e5b5b2'}c.onclick=()=>toggleObstacle(x,y);grid.appendChild(c)}
+document.getElementById('edgeDetails').innerHTML=`<div class="item"><strong>Decision mode:</strong> ${edge.mode}</div><div class="item"><strong>Model loaded:</strong> ${edge.model_loaded?'Yes':'No — rules used'}</div><div class="item"><strong>Cloud required:</strong> No</div><div class="item"><strong>Fallback:</strong> ${edge.fallback_active?'Active':'Inactive'}</div><div class="item muted">${edge.fallback_reason||''}</div>`;
+document.getElementById('fleet').innerHTML=current.robots.map(r=>`<div class="item"><strong>${r.id}</strong><span class="status">${r.status}</span><div class="muted">Position (${r.position.join(', ')}) · Task ${r.task_id||'—'} · Completed ${r.completed}</div>${r.status!=='failed'?`<button class="btn warn" style="margin-top:7px" onclick="failRobot('${r.id}')">Simulate failure</button>`:''}</div>`).join('')+current.tasks.map(t=>`<div class="item"><strong>${t.id}</strong> ${t.status}<div class="muted">Priority ${t.priority} · Robot ${t.assigned_robot_id||'unassigned'}</div></div>`).join('');
+document.getElementById('logs').innerHTML=current.logs.slice().reverse().map(l=>`<div class="log">${esc(l)}</div>`).join('');
+document.getElementById('explain').textContent=edge.recent_decisions.length?edge.recent_decisions.slice(-3).map(d=>`${d.robot_id||'No robot'} → ${d.task_id}: ${d.reason}`).join(' | '):'Advance the simulation to see assignment explanations.'}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+async function step(){try{await request('/step',{method:'POST'});await refresh()}catch(e){alert(e.message)}}
+async function toggleObstacle(x,y){try{await request('/obstacle',{method:'POST',body:JSON.stringify({x,y})});await refresh()}catch(e){alert(e.message)}}
+async function failRobot(id){try{await request('/fail',{method:'POST',body:JSON.stringify({robot_id:id})});await refresh()}catch(e){alert(e.message)}}
+async function toggleOffline(){try{await request('/offline/'+(!current.offline_simulated),{method:'POST'});await refresh()}catch(e){alert(e.message)}}
+async function resetSim(){try{await request('/reset',{method:'POST'});await refresh()}catch(e){alert(e.message)}}
+refresh();setInterval(refresh,2500);
+</script></body></html>
