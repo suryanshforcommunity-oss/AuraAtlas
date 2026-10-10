@@ -4,9 +4,10 @@
   "description": "Autonomous Warehouse Swarm Coordinator - SaaS Dashboard in Node.js and TypeScript",
   "main": "dist/server/index.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"npm run dev:edge\"",
     "dev:server": "tsx watch server/src/index.ts",
     "dev:client": "vite",
+    "dev:edge": ".\\.venv\\Scripts\\python.exe -m uvicorn api:app --app-dir AURA-EdgeAI/AURA-EdgeAI --host 127.0.0.1 --port 8001",
     "build": "tsc && vite build",
     "start": "node dist/server/index.js"
   },

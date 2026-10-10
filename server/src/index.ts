@@ -278,6 +278,63 @@ app.post('/api/map/switch', (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
+// ==========================================
+// AURA EdgeAI Local Integration Endpoints
+// ==========================================
+const EDGE_AI_URL = process.env.EDGE_AI_URL || 'http://127.0.0.1:8001';
+
+app.get('/api/edge/status', async (_req: Request, res: Response) => {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch(`${EDGE_AI_URL}/edge/status`, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!response.ok) {
+      return res.status(response.status).json({ ok: false, error: 'Edge AI response error' });
+    }
+    const data = await response.json();
+    res.json({ ok: true, connected: true, ...data });
+  } catch (err: any) {
+    res.json({ ok: false, connected: false, message: 'AURA EdgeAI offline or unreachable on ' + EDGE_AI_URL });
+  }
+});
+
+app.post('/api/edge/step', async (_req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${EDGE_AI_URL}/step`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await response.json();
+    res.json({ ok: true, ...data });
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/edge/offline/:enabled', async (req: Request, res: Response) => {
+  try {
+    const enabled = req.params.enabled === 'true';
+    const response = await fetch(`${EDGE_AI_URL}/offline/${enabled}`, {
+      method: 'POST'
+    });
+    const data = await response.json();
+    res.json({ ok: true, ...data });
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/edge/reset', async (_req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${EDGE_AI_URL}/reset`, { method: 'POST' });
+    const data = await response.json();
+    res.json({ ok: true, ...data });
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
 // Serve frontend dist static assets
 const DIST_DIR = path.resolve(__dirname, '../../dist');
 app.use(express.static(DIST_DIR));

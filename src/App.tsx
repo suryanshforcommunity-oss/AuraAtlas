@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { OrderModal } from './components/OrderModal';
 import { MapConfigModal } from './components/MapConfigModal';
 import { EmergencyCorridorModal } from './components/EmergencyCorridorModal';
+import { EdgeAIModal } from './components/EdgeAIModal';
 import { LandingPage } from './components/LandingPage';
 import { TelemetryPage } from './components/TelemetryPage';
 import { AnalyticsPage } from './components/AnalyticsPage';
@@ -23,6 +24,7 @@ export const App: React.FC = () => {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
   const [isMapModalOpen, setIsMapModalOpen] = useState<boolean>(false);
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState<boolean>(false);
+  const [isEdgeModalOpen, setIsEdgeModalOpen] = useState<boolean>(false);
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -233,6 +235,7 @@ export const App: React.FC = () => {
           onNavigateArchitecture={handleNavigateArchitecture}
           onNavigateTelemetry={() => setActiveView('telemetry')}
           onNavigateAnalytics={() => setActiveView('analytics')}
+          onOpenEdgeAIModal={() => setIsEdgeModalOpen(true)}
         />
 
         {/* Center: Interactive Warehouse Simulation Canvas */}
@@ -280,6 +283,12 @@ export const App: React.FC = () => {
         state={simState}
         onActivate={handleActivateEmergency}
         onCancel={handleCancelEmergency}
+      />
+
+      {/* AURA EdgeAI Decision Engine Modal */}
+      <EdgeAIModal
+        isOpen={isEdgeModalOpen}
+        onClose={() => setIsEdgeModalOpen(false)}
       />
     </div>
   );

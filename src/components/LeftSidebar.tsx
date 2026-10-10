@@ -16,7 +16,8 @@ import {
   Truck,
   BatteryCharging,
   Siren,
-  Sliders
+  Sliders,
+  Cpu
 } from 'lucide-react';
 import { SimulationState } from '../types/fleet';
 
@@ -33,6 +34,7 @@ interface LeftSidebarProps {
   onNavigateArchitecture?: () => void;
   onNavigateTelemetry?: () => void;
   onNavigateAnalytics?: () => void;
+  onOpenEdgeAIModal?: () => void;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -48,6 +50,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onNavigateArchitecture,
   onNavigateTelemetry,
   onNavigateAnalytics,
+  onOpenEdgeAIModal,
 }) => {
   const robots = state?.robots || [];
   const activeCount = robots.filter(r => r.state === 'moving').length;
@@ -101,6 +104,19 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             >
               <Server className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
               <span>Architecture</span>
+            </button>
+          )}
+
+          {onOpenEdgeAIModal && (
+            <button
+              onClick={onOpenEdgeAIModal}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-purple-300 hover:text-purple-200 bg-purple-950/20 hover:bg-purple-950/40 border border-purple-500/30 hover:border-purple-500/50 transition-all group shadow-sm shadow-purple-950/40"
+            >
+              <div className="flex items-center gap-2.5">
+                <Cpu className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
+                <span>AURA EdgeAI</span>
+              </div>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Local Decision Engine Ready" />
             </button>
           )}
         </div>
