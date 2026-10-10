@@ -6,9 +6,10 @@ import {
   PlusCircle,
   Map,
   Activity,
-  Zap,
   StepForward,
-  Siren
+  Siren,
+  Wifi,
+  Sparkles
 } from 'lucide-react';
 import { SimulationState } from '../types/fleet';
 
@@ -38,40 +39,50 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isEmergency = state?.emergency?.active ?? false;
 
   return (
-    <header className="h-16 bg-[#0b0f19]/95 border-b border-slate-800/80 px-4 md:px-6 flex items-center justify-between z-30 backdrop-blur-md select-none">
+    <header className="h-16 bg-[#080c16]/95 border-b border-slate-800/80 px-4 md:px-6 flex items-center justify-between z-30 backdrop-blur-md select-none">
       {/* 1. Left: Brand & Live Tick Engine */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Zap className="w-5 h-5 text-white animate-pulse" />
+          <div className="relative group cursor-pointer">
+            <div className="w-10 h-10 rounded-xl bg-slate-900/90 border border-cyan-500/40 p-1 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:border-cyan-400 group-hover:shadow-cyan-500/40 transition-all">
+              <img
+                src="/logo-icon.png"
+                alt="FleetSync Hexagonal Swarm Logo"
+                className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(0,240,255,0.7)] group-hover:scale-105 transition-transform"
+              />
             </div>
             <div
-              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0b0f19] ${
-                connected ? 'bg-emerald-500 shadow-sm shadow-emerald-500' : 'bg-rose-500'
+              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#080c16] ${
+                connected
+                  ? 'bg-emerald-400 shadow-sm shadow-emerald-400 animate-pulse'
+                  : 'bg-cyan-400 shadow-sm shadow-cyan-400'
               }`}
-              title={connected ? 'Simulation Engine Connected' : 'Connecting to Engine...'}
+              title={connected ? 'Live Simulation Engine Connected' : 'In-Browser Autonomous Engine Active'}
             />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-bold text-base tracking-tight text-white flex items-center gap-2">
-                FleetSync <span className="text-indigo-400 font-semibold text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">AI Coordinator</span>
+              <h1 className="font-bold text-base tracking-wider flex items-center gap-1.5">
+                <span className="text-white font-extrabold tracking-wide">FLEET</span>
+                <span className="text-cyan-400 font-extrabold tracking-wide drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]">SYNC</span>
+                <span className="text-cyan-300 font-semibold text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30">
+                  {connected ? 'LIVE MESH' : 'DEMO ENGINE'}
+                </span>
               </h1>
             </div>
             <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
-              <span>Multi-Agent Swarm Orchestration</span>
+              <span>Autonomous Warehouse Coordinator</span>
               <span className="inline-block w-1 h-1 rounded-full bg-slate-600"></span>
-              <span className="text-indigo-300 font-mono">v2.4 TS</span>
+              <span className="text-cyan-400 font-mono text-[10px]">v4.8 TS</span>
             </p>
           </div>
         </div>
 
         {/* Live Tick Pill */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
-          <Activity className="w-3.5 h-3.5 text-indigo-400 animate-spin" style={{ animationDuration: '4s' }} />
+          <Activity className="w-3.5 h-3.5 text-cyan-400 animate-spin" style={{ animationDuration: '4s' }} />
           <span className="text-slate-400">Tick:</span>
-          <span className="font-mono font-bold text-indigo-300">{tick}</span>
+          <span className="font-mono font-bold text-cyan-300">{tick}</span>
           <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`}></span>
         </div>
       </div>
@@ -131,7 +142,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Dispatch Order Action */}
         <button
           onClick={onOpenOrderModal}
-          className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-md shadow-indigo-500/20 border border-indigo-400/30 transition-all active:scale-95"
+          className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-md shadow-cyan-500/20 border border-cyan-400/30 transition-all active:scale-95"
         >
           <PlusCircle className="w-4 h-4" />
           <span>Dispatch Order</span>

@@ -239,13 +239,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Top Header Navigation */}
       <header className="h-20 border-b border-slate-800 px-6 lg:px-16 flex items-center justify-between backdrop-blur-xl bg-black/80 sticky top-0 z-40 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-cyan-500 text-slate-950 font-bold flex items-center justify-center shadow-lg glow-cyan">
-            <Zap className="w-6 h-6 fill-slate-950" />
+          <div className="w-11 h-11 rounded-xl bg-slate-900/90 border border-cyan-500/40 p-1 flex items-center justify-center shadow-lg shadow-cyan-500/20 backdrop-blur-sm">
+            <img
+              src="/logo-icon.png"
+              alt="FleetSync"
+              className="w-full h-full object-contain filter drop-shadow-[0_0_10px_rgba(0,240,255,0.7)]"
+            />
           </div>
           <div>
-            <h1 className="font-bold text-lg font-headline tracking-wider text-cyan-300 uppercase flex items-center gap-2">
-              FleetSync AGV
-              <span className="text-cyan-400 font-mono text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 tracking-widest">
+            <h1 className="font-bold text-lg font-headline tracking-wider text-white uppercase flex items-center gap-1.5">
+              <span>FLEET</span><span className="text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]">SYNC</span> AGV
+              <span className="text-cyan-400 font-mono text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 tracking-widest ml-1">
                 MESH v4.8.2 ACTIVE
               </span>
             </h1>
@@ -612,9 +616,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Footer */}
       <footer className="py-8 border-t border-cyan-500/20 px-6 lg:px-16 text-center text-xs font-mono text-slate-500 shrink-0 relative z-10">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-7xl mx-auto">
-          <div className="flex items-center gap-2 text-slate-400 font-medium font-headline">
-            <Zap className="w-4 h-4 text-cyan-400" />
-            <span>FleetSync AI Swarm Coordinator</span>
+          <div className="flex items-center gap-2.5 text-slate-400 font-medium font-headline">
+            <img src="/logo-icon.png" alt="FleetSync" className="w-5 h-5 object-contain" />
+            <span><span className="text-white font-semibold">FLEET</span><span className="text-cyan-400 font-semibold">SYNC</span> AI Swarm Coordinator</span>
           </div>
           <p>© 2026 FleetSync. Multi-Agent Pathfinding & Swarm Analytics Engine.</p>
         </div>
