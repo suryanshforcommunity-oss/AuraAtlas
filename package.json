@@ -12,6 +12,7 @@
     "start": "node dist/server/index.js"
   },
   "dependencies": {
+    "@types/three": "^0.186.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "lucide-react": "^0.469.0",
@@ -19,6 +20,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-icons": "^5.7.0",
+    "three": "^0.186.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {

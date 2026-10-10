@@ -6,7 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { OrderModal } from './components/OrderModal';
 import { MapConfigModal } from './components/MapConfigModal';
 import { EmergencyCorridorModal } from './components/EmergencyCorridorModal';
-import { EdgeAIModal } from './components/EdgeAIModal';
+import { Warehouse3DModal } from './components/Warehouse3DModal';
 import { LandingPage } from './components/LandingPage';
 import { TelemetryPage } from './components/TelemetryPage';
 import { AnalyticsPage } from './components/AnalyticsPage';
@@ -285,10 +285,11 @@ export const App: React.FC = () => {
         onCancel={handleCancelEmergency}
       />
 
-      {/* AURA EdgeAI Decision Engine Modal */}
-      <EdgeAIModal
+      {/* AURA EdgeAI 3D Warehouse Digital Twin Modal */}
+      <Warehouse3DModal
         isOpen={isEdgeModalOpen}
         onClose={() => setIsEdgeModalOpen(false)}
+        state={simState}
       />
     </div>
   );

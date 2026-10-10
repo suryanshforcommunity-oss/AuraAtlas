@@ -17,7 +17,8 @@ import {
   BatteryCharging,
   Siren,
   Sliders,
-  Cpu
+  Cpu,
+  Boxes
 } from 'lucide-react';
 import { SimulationState } from '../types/fleet';
 
@@ -110,13 +111,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           {onOpenEdgeAIModal && (
             <button
               onClick={onOpenEdgeAIModal}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-purple-300 hover:text-purple-200 bg-purple-950/20 hover:bg-purple-950/40 border border-purple-500/30 hover:border-purple-500/50 transition-all group shadow-sm shadow-purple-950/40"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-cyan-300 hover:text-cyan-200 bg-cyan-950/30 hover:bg-cyan-950/50 border border-cyan-500/40 hover:border-cyan-500/60 transition-all group shadow-md shadow-cyan-950/40"
+              title="Open Interactive 3D Warehouse Digital Twin & AURA EdgeAI"
             >
               <div className="flex items-center gap-2.5">
-                <Cpu className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
-                <span>AURA EdgeAI</span>
+                <Boxes className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                <span>AURA EdgeAI 3D</span>
               </div>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Local Decision Engine Ready" />
+              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                3D
+              </span>
             </button>
           )}
         </div>
