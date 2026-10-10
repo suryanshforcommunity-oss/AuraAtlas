@@ -1,51 +1,7 @@
-import { SimulationState, GridData, RobotData, StationData, EmergencyCorridorData, HeatmapPoint } from '../types/fleet';
+import { SimulationState, GridData, RobotData, StationData, HeatmapPoint } from '../types/fleet';
+import { loadGridByName, FREE, createCustomWarehouseGrid } from './mapLoader';
 
-// Generate default warehouse layout (10 columns x 20 rows)
-export function createDefaultGrid(): GridData {
-  const width = 10;
-  const height = 20;
-  const cells: number[][] = [];
-
-  for (let y = 0; y < height; y++) {
-    const row: number[] = [];
-    for (let x = 0; x < width; x++) {
-      // Create shelf racks with aisles
-      const isShelf = (x === 2 || x === 3 || x === 6 || x === 7) && y >= 3 && y <= 16 && y % 3 !== 0;
-      row.push(isShelf ? 1 : 0);
-    }
-    cells.push(row);
-  }
-
-  const pick_stations: [number, number][] = [
-    [0, 1],
-    [9, 1],
-    [0, 18],
-    [9, 18],
-  ];
-
-  const drop_stations: [number, number][] = [
-    [1, 0],
-    [8, 0],
-    [1, 19],
-    [8, 19],
-  ];
-
-  const charging_stations: [number, number][] = [
-    [4, 0],
-    [5, 0],
-  ];
-
-  return {
-    width,
-    height,
-    cells,
-    pick_stations,
-    drop_stations,
-    charging_stations,
-  };
-}
-
-const ROBOT_COLORS = [
+export const ROBOT_COLORS = [
   '#3b82f6', // 0 Blue
   '#06b6d4', // 1 Cyan
   '#10b981', // 2 Emerald
@@ -56,10 +12,14 @@ const ROBOT_COLORS = [
   '#14b8a6', // 7 Teal
   '#84cc16', // 8 Lime
   '#f97316', // 9 Orange
+  '#0284c7', // 10 Sky
+  '#e11d48', // 11 Rose
 ];
 
-// Helper to find simple BFS path between two points
-function findPath(grid: GridData, start: [number, number], target: [number, number]): [number, number][] {
+// Helper to find BFS shortest path on any grid
+export function findPath(grid: GridData, start: [number, number], target: [number, number]): [number, number][] {
+  if (start[0] === target[0] && start[1] === target[1]) return [start];
+
   const queue: [number, number, [number, number][]][] = [[start[0], start[1], [start]]];
   const visited = new Set<string>();
   visited.add(`${start[0]},${start[1]}`);
@@ -87,7 +47,7 @@ function findPath(grid: GridData, start: [number, number], target: [number, numb
         nx < grid.width &&
         ny >= 0 &&
         ny < grid.height &&
-        grid.cells[ny][nx] === 0 &&
+        grid.cells[ny][nx] === FREE &&
         !visited.has(key)
       ) {
         visited.add(key);
@@ -98,56 +58,96 @@ function findPath(grid: GridData, start: [number, number], target: [number, numb
   return [start, target];
 }
 
-export function createDefaultSimulationState(): SimulationState {
-  const grid = createDefaultGrid();
+/**
+ * Creates full simulation state for any warehouse map (default 'custom' or any benchmark map)
+ */
+export function createSimulationStateForMap(mapName = 'custom', numRobots = 10, capacity = 1): SimulationState {
+  const grid = loadGridByName(mapName);
 
-  const stations: StationData[] = [
-    { id: 1, x: 0, y: 1, type: 'pick', current: 48, max: 50, priority: 1, pct: 96 },
-    { id: 2, x: 9, y: 1, type: 'pick', current: 36, max: 50, priority: 2, pct: 72 },
-    { id: 3, x: 0, y: 18, type: 'pick', current: 42, max: 50, priority: 1, pct: 84 },
-    { id: 4, x: 9, y: 18, type: 'pick', current: 28, max: 50, priority: 2, pct: 56 },
-    { id: 5, x: 1, y: 0, type: 'drop', current: 12, max: 60, priority: 1, pct: 20 },
-    { id: 6, x: 8, y: 0, type: 'drop', current: 24, max: 60, priority: 1, pct: 40 },
-    { id: 7, x: 1, y: 19, type: 'drop', current: 18, max: 60, priority: 2, pct: 30 },
-    { id: 8, x: 8, y: 19, type: 'drop', current: 30, max: 60, priority: 1, pct: 50 },
-  ];
+  // Stations from grid pick and drop locations
+  const stations: StationData[] = [];
+  let sid = 1;
 
-  const spawnPoints: [number, number][] = [
-    [1, 2], [4, 2], [8, 2],
-    [1, 8], [4, 8], [8, 8],
-    [1, 14], [5, 14], [8, 14],
-    [4, 18],
-  ];
-
-  const robots: RobotData[] = spawnPoints.map((pt, idx) => {
-    const isPick = idx % 2 === 0;
-    const target = isPick ? grid.pick_stations[idx % grid.pick_stations.length] : grid.drop_stations[idx % grid.drop_stations.length];
-    const path = findPath(grid, pt, target);
-
-    return {
-      id: idx,
-      x: pt[0],
-      y: pt[1],
-      color: ROBOT_COLORS[idx % ROBOT_COLORS.length],
-      state: 'moving',
-      phase: isPick ? 'pickup' : 'dropoff',
-      task_id: 100 + idx,
-      target,
-      pickup: grid.pick_stations[idx % grid.pick_stations.length],
-      dropoff: grid.drop_stations[idx % grid.drop_stations.length],
-      carrying: isPick ? 0 : 1,
-      capacity: 1,
-      battery: 85 + (idx * 3) % 15,
-      path,
-      done: idx * 3,
-    };
+  grid.pick_stations.forEach((pos, idx) => {
+    stations.push({
+      id: sid++,
+      x: pos[0],
+      y: pos[1],
+      type: 'pick',
+      current: 40 + (idx % 3) * 5,
+      max: 50,
+      priority: (idx % 2) + 1,
+      pct: 80 + (idx % 3) * 10,
+    });
   });
 
+  grid.drop_stations.forEach((pos, idx) => {
+    stations.push({
+      id: sid++,
+      x: pos[0],
+      y: pos[1],
+      type: 'drop',
+      current: 10 + (idx % 4) * 8,
+      max: 60,
+      priority: (idx % 2) + 1,
+      pct: 20 + (idx % 4) * 15,
+    });
+  });
+
+  // Find candidate free cells for robot spawning (aisles and perimeter)
+  const freeCells: [number, number][] = [];
+  for (let y = 1; y < grid.height - 1; y++) {
+    for (let x = 1; x < grid.width - 1; x++) {
+      if (grid.cells[y][x] === FREE) {
+        // Prefer cells not directly on pick or drop stations
+        const isStation =
+          grid.pick_stations.some(p => p[0] === x && p[1] === y) ||
+          grid.drop_stations.some(d => d[0] === x && d[1] === y);
+        if (!isStation) {
+          freeCells.push([x, y]);
+        }
+      }
+    }
+  }
+
+  // Pick evenly spaced spawn locations
+  const stride = Math.max(1, Math.floor(freeCells.length / numRobots));
+  const robots: RobotData[] = [];
+
+  for (let i = 0; i < numRobots; i++) {
+    const spawnPos = freeCells[(i * stride) % freeCells.length] || [1, 1];
+    const isPick = i % 2 === 0;
+    const target = isPick
+      ? grid.pick_stations[i % grid.pick_stations.length]
+      : grid.drop_stations[i % grid.drop_stations.length];
+
+    const path = findPath(grid, spawnPos, target);
+
+    robots.push({
+      id: i,
+      x: spawnPos[0],
+      y: spawnPos[1],
+      color: ROBOT_COLORS[i % ROBOT_COLORS.length],
+      state: 'moving',
+      phase: isPick ? 'pickup' : 'dropoff',
+      task_id: 100 + i,
+      target,
+      pickup: grid.pick_stations[i % grid.pick_stations.length],
+      dropoff: grid.drop_stations[i % grid.drop_stations.length],
+      carrying: isPick ? 0 : 1,
+      capacity,
+      battery: 88 + ((i * 3) % 12),
+      path,
+      done: i * 2,
+    });
+  }
+
+  // Ambient heatmap
   const heatmap: HeatmapPoint[] = [];
   for (let y = 0; y < grid.height; y++) {
     for (let x = 0; x < grid.width; x++) {
-      if (grid.cells[y][x] === 0) {
-        heatmap.push({ x, y, v: Math.floor(Math.random() * 8) });
+      if (grid.cells[y][x] === FREE && (x * 7 + y * 13) % 5 === 0) {
+        heatmap.push({ x, y, v: Math.floor(Math.random() * 6) + 1 });
       }
     }
   }
@@ -156,27 +156,27 @@ export function createDefaultSimulationState(): SimulationState {
     tick: 1,
     running: true,
     job_finished: false,
-    total_pick_stock: 154,
+    total_pick_stock: stations.filter(s => s.type === 'pick').reduce((acc, s) => acc + s.current, 0),
     robots,
     stations,
     hive_mind: [
-      { type: 'auction', msg: 'System initialized. 10 AGV units active.' },
-      { type: 'pickup', msg: 'Robot #0 inbound to Pick Station #1' },
-      { type: 'delivery', msg: 'Robot #1 completed dropoff at Station #5' },
+      { type: 'auction', msg: `Swarm initialized on ${mapName}. ${numRobots} AGV units deployed.` },
+      { type: 'pickup', msg: `Robot #0 inbound to Pick Station (${grid.pick_stations[0]?.[0]}, ${grid.pick_stations[0]?.[1]})` },
+      { type: 'delivery', msg: `Robot #1 routed to Drop Dock (${grid.drop_stations[0]?.[0]}, ${grid.drop_stations[0]?.[1]})` },
     ],
     conflicts: [],
     performance: {
-      throughput_100: 24.5,
-      avg_delivery: 14.2,
+      throughput_100: 28.4,
+      avg_delivery: 12.8,
       conflicts: 0,
-      replans: 12,
-      total_deliveries: 48,
+      replans: 8,
+      total_deliveries: 42,
     },
     heatmap,
-    events: ['[00:00:01] Autonomous Swarm Orchestrator Online.'],
+    events: [`[00:00:01] Map ${mapName} loaded. Autonomous Swarm Online.`],
     metrics: {
-      throughput: 48,
-      active: 10,
+      throughput: 42,
+      active: numRobots,
       idle: 0,
       failed: 0,
       charging: 0,
@@ -196,24 +196,33 @@ export function createDefaultSimulationState(): SimulationState {
   };
 }
 
-// Client-side step simulator
+/**
+ * Returns default simulation state with the standard structured pod warehouse map
+ */
+export function createDefaultSimulationState(): SimulationState {
+  return createSimulationStateForMap('custom', 10, 1);
+}
+
+/**
+ * Step client-side simulation tick with clean float formatting and collision avoidance
+ */
 export function stepClientSimulation(prev: SimulationState): SimulationState {
   if (!prev.grid) return prev;
   const grid = prev.grid;
   const tick = prev.tick + 1;
 
   let totalDeliveries = prev.performance.total_deliveries;
-  let totalPickStock = prev.total_pick_stock ?? 154;
+  let totalPickStock = prev.total_pick_stock ?? 150;
   const hive = [...prev.hive_mind];
   const emergency = prev.emergency ? { ...prev.emergency } : undefined;
 
   const robots = prev.robots.map(r => {
     if (r.state === 'failed') return r;
 
-    // Battery simulation
-    const newBattery = Math.max(15, r.battery - 0.05);
+    // Clean rounded battery simulation (no float decimals like .9500000000029%)
+    const newBattery = Math.round(Math.max(15, r.battery - 0.05) * 10) / 10;
 
-    // If emergency robot
+    // Emergency corridor active
     if (emergency?.active && emergency.robotId === r.id) {
       if (r.path.length > 1) {
         const nextCell = r.path[1];
@@ -226,11 +235,10 @@ export function stepClientSimulation(prev: SimulationState): SimulationState {
           isEmergency: true,
         };
       } else {
-        // Emergency delivered
         if (emergency.status === 'active') {
           emergency.status = 'completed';
           emergency.active = false;
-          hive.unshift({ type: 'emergency', msg: `VIP Delivery Complete by Robot #${r.id}!` });
+          hive.unshift({ type: 'emergency', msg: `VIP Corridor Completed: Robot #${r.id} delivered priority payload!` });
         }
         return {
           ...r,
@@ -252,24 +260,22 @@ export function stepClientSimulation(prev: SimulationState): SimulationState {
         battery: newBattery,
       };
     } else {
-      // Reached destination! Switch phase
+      // Reached destination, toggle phase
       const currentPos: [number, number] = [r.x, r.y];
-      let newPhase: 'pickup' | 'dropoff' = r.phase === 'pickup' ? 'dropoff' : 'pickup';
+      const newPhase: 'pickup' | 'dropoff' = r.phase === 'pickup' ? 'dropoff' : 'pickup';
       let nextTarget: [number, number];
 
       if (newPhase === 'dropoff') {
-        // Picked item, target drop station
-        nextTarget = grid.drop_stations[(r.id + tick) % grid.drop_stations.length];
+        nextTarget = grid.drop_stations[(r.id + tick) % grid.drop_stations.length] || [1, 1];
         totalPickStock = Math.max(0, totalPickStock - 1);
-        if (Math.random() < 0.2) {
+        if (Math.random() < 0.25) {
           hive.unshift({ type: 'pickup', msg: `Robot #${r.id} loaded payload at (${r.x}, ${r.y})` });
         }
       } else {
-        // Dropped item, target pick station
-        nextTarget = grid.pick_stations[(r.id + tick) % grid.pick_stations.length];
+        nextTarget = grid.pick_stations[(r.id + tick) % grid.pick_stations.length] || [grid.width - 2, grid.height - 2];
         totalDeliveries += 1;
-        if (Math.random() < 0.2) {
-          hive.unshift({ type: 'delivery', msg: `Robot #${r.id} completed delivery at (${r.x}, ${r.y})` });
+        if (Math.random() < 0.25) {
+          hive.unshift({ type: 'delivery', msg: `Robot #${r.id} delivered item to Drop Dock (${r.x}, ${r.y})` });
         }
       }
 
@@ -291,11 +297,11 @@ export function stepClientSimulation(prev: SimulationState): SimulationState {
     tick,
     total_pick_stock: totalPickStock,
     robots,
-    hive_mind: hive.slice(0, 40),
+    hive_mind: hive.slice(0, 35),
     performance: {
       ...prev.performance,
       total_deliveries: totalDeliveries,
-      throughput_100: parseFloat((20 + (totalDeliveries % 15)).toFixed(1)),
+      throughput_100: Math.round((22 + (totalDeliveries % 18)) * 10) / 10,
     },
     metrics: {
       ...prev.metrics,

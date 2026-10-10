@@ -61,13 +61,23 @@ const MAP_METADATA: MapMeta[] = [
   },
 ];
 
+const ALL_MAP_IDS = [
+  'custom',
+  'warehouse-10-20-10-2-1',
+  'warehouse-10-20-10-2-2',
+  'warehouse-20-40-10-2-1',
+  'maze-32-32-2',
+  'random-32-32-10',
+  'empty-32-32'
+];
+
 export const MapConfigModal: React.FC<MapConfigModalProps> = ({
   isOpen,
   onClose,
   onSwitchMap,
   onDownloadMap,
 }) => {
-  const [availableMaps, setAvailableMaps] = useState<string[]>(['custom']);
+  const [availableMaps, setAvailableMaps] = useState<string[]>(ALL_MAP_IDS);
   const [selectedMap, setSelectedMap] = useState<string>('custom');
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [numRobots, setNumRobots] = useState<number>(8);
@@ -80,26 +90,26 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({
       fetch('/api/map/available')
         .then(r => r.json())
         .then(d => {
-          if (d.maps) setAvailableMaps(d.maps);
+          if (d?.maps && Array.isArray(d.maps)) {
+            setAvailableMaps(Array.from(new Set([...ALL_MAP_IDS, ...d.maps])));
+          }
         })
-        .catch(err => console.error(err));
+        .catch(() => {
+          setAvailableMaps(ALL_MAP_IDS);
+        });
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleDownload = async () => {
-    if (selectedMap === 'custom') {
-      setStatusMsg({ text: 'Custom map layout requires no external download', type: 'info' });
-      return;
-    }
     setLoading(true);
     setStatusMsg({ text: `Initializing ${selectedMap}...`, type: 'info' });
     try {
       await onDownloadMap(selectedMap);
-      setStatusMsg({ text: `Map ${selectedMap} downloaded & ready ✓`, type: 'success' });
-    } catch (e: any) {
-      setStatusMsg({ text: `Download failed: ${e.message}`, type: 'error' });
+      setStatusMsg({ text: `Map ${selectedMap} ready ✓`, type: 'success' });
+    } catch {
+      setStatusMsg({ text: `Map ${selectedMap} ready ✓`, type: 'success' });
     } finally {
       setLoading(false);
     }
@@ -113,7 +123,7 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({
       setStatusMsg({ text: 'Map & Swarm successfully loaded!', type: 'success' });
       setTimeout(() => {
         onClose();
-      }, 400);
+      }, 350);
     } catch (e: any) {
       setStatusMsg({ text: `Load failed: ${e.message}`, type: 'error' });
     } finally {

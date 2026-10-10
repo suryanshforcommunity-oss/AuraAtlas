@@ -484,7 +484,7 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
             ctx.font = `bold ${Math.max(CELL * 0.35, 8)}px JetBrains Mono, monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`${r.battery}%`, cx, cy);
+            ctx.fillText(r.battery !== undefined ? `${Math.round(r.battery)}%` : 'VIP', cx, cy);
           }
         }
         // --- NORMAL ROBOT RENDERING ---
@@ -514,10 +514,10 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
 
           if (CELL > 11) {
             ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${Math.max(CELL * 0.35, 8)}px JetBrains Mono, monospace`;
+            ctx.font = `bold ${Math.max(CELL * 0.38, 9)}px JetBrains Mono, monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(r.battery !== undefined ? `${r.battery}%` : `${r.id}`, cx, cy);
+            ctx.fillText(`${r.id}`, cx, cy);
           }
         }
 

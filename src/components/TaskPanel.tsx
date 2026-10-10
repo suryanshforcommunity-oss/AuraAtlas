@@ -79,7 +79,7 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({ robots, onFailRobot }) => 
               <span>Pos: <strong className="text-slate-200 font-mono">({r.x},{r.y})</strong></span>
               <span>Target: <strong className="text-indigo-300 font-mono">{targetTxt}</strong></span>
               <span className={`font-mono font-bold ${r.battery <= 15 ? 'text-amber-400 animate-pulse' : 'text-emerald-400'}`}>
-                ⚡ {r.battery !== undefined ? r.battery : 100}%
+                ⚡ {r.battery !== undefined ? Math.round(r.battery) : 100}%
               </span>
               {r.carrying > 0 && (
                 <span className="text-amber-300 font-medium flex items-center gap-1 font-mono">

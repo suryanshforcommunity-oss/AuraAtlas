@@ -11,10 +11,11 @@ import { LandingPage } from './components/LandingPage';
 import { TelemetryPage } from './components/TelemetryPage';
 import { AnalyticsPage } from './components/AnalyticsPage';
 import { SimulationState } from './types/fleet';
-import { createDefaultSimulationState, stepClientSimulation } from './sim/clientSimulation';
+import { createDefaultSimulationState, stepClientSimulation, createSimulationStateForMap } from './sim/clientSimulation';
 
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'landing' | 'map' | 'telemetry' | 'analytics'>('landing');
+  const [currentMapName, setCurrentMapName] = useState<string>('custom');
   // Initialize with rich simulation state so it never starts empty
   const [simState, setSimState] = useState<SimulationState>(createDefaultSimulationState());
   const [connected, setConnected] = useState<boolean>(false);
@@ -144,7 +145,7 @@ export const App: React.FC = () => {
     if (connected) {
       apiCall('/api/control/reset');
     } else {
-      setSimState(createDefaultSimulationState());
+      setSimState(createSimulationStateForMap(currentMapName));
     }
   };
 
@@ -216,22 +217,32 @@ export const App: React.FC = () => {
   };
 
   const handleDownloadMap = async (mapName: string) => {
-    return await apiCall(`/api/map/download/${mapName}`, 'POST');
+    if (connected) {
+      return await apiCall(`/api/map/download/${mapName}`, 'POST');
+    }
+    return { ok: true, message: `Benchmark ${mapName} ready in-memory` };
   };
 
   const handleSwitchMap = async (mapName: string, numRobots: number, capacity: number) => {
-    return await apiCall('/api/map/switch', 'POST', {
-      map_name: mapName,
-      num_robots: numRobots,
-      robot_capacity: capacity,
-    });
+    setCurrentMapName(mapName);
+    if (connected) {
+      return await apiCall('/api/map/switch', 'POST', {
+        map_name: mapName,
+        num_robots: numRobots,
+        robot_capacity: capacity,
+      });
+    } else {
+      const nextState = createSimulationStateForMap(mapName, numRobots, capacity);
+      setSimState(nextState);
+      return { ok: true };
+    }
   };
 
   const handleClearBlocks = () => {
     if (connected) {
       apiCall('/api/event/clear-blocks');
     } else {
-      setSimState(createDefaultSimulationState());
+      setSimState(createSimulationStateForMap(currentMapName));
     }
   };
 
