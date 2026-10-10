@@ -325,6 +325,54 @@ app.post('/api/edge/offline/:enabled', async (req: Request, res: Response) => {
   }
 });
 
+app.get('/api/edge/state', async (_req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${EDGE_AI_URL}/state`);
+    const data = await response.json();
+    res.json({ ok: true, state: data });
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/edge/train', async (_req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${EDGE_AI_URL}/train`, { method: 'POST' });
+    const data = await response.json();
+    res.json({ ok: true, ...data });
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/edge/obstacle', async (req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${EDGE_AI_URL}/obstacle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    res.json({ ok: true, ...data });
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/edge/fail', async (req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${EDGE_AI_URL}/fail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    res.json({ ok: true, state: data });
+  } catch (err: any) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
 app.post('/api/edge/reset', async (_req: Request, res: Response) => {
   try {
     const response = await fetch(`${EDGE_AI_URL}/reset`, { method: 'POST' });
