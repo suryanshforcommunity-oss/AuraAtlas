@@ -11,7 +11,12 @@ import { LandingPage } from './components/LandingPage';
 import { TelemetryPage } from './components/TelemetryPage';
 import { AnalyticsPage } from './components/AnalyticsPage';
 import { SimulationState } from './types/fleet';
-import { createDefaultSimulationState, stepClientSimulation, createSimulationStateForMap } from './sim/clientSimulation';
+import {
+  createDefaultSimulationState,
+  stepClientSimulation,
+  createSimulationStateForMap,
+  toggleObstacleClientSimulation,
+} from './sim/clientSimulation';
 
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'landing' | 'map' | 'telemetry' | 'analytics'>('landing');
@@ -153,20 +158,7 @@ export const App: React.FC = () => {
     if (connected) {
       apiCall('/api/event/block', 'POST', { x, y });
     } else {
-      setSimState(prev => {
-        if (!prev.grid) return prev;
-        const newCells = prev.grid.cells.map((row, ry) =>
-          row.map((val, rx) => (rx === x && ry === y ? (val === 1 ? 0 : 1) : val))
-        );
-        return {
-          ...prev,
-          grid: { ...prev.grid, cells: newCells },
-          events: [
-            `[${new Date().toLocaleTimeString()}] Obstacle toggled at (${x}, ${y})`,
-            ...prev.events.slice(0, 30),
-          ],
-        };
-      });
+      setSimState(prev => toggleObstacleClientSimulation(prev, x, y));
     }
   };
 

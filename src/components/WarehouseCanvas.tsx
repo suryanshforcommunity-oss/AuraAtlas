@@ -579,11 +579,10 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!blockMode || !grid || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const clientX = (e.clientX - rect.left) / scale;
-    const clientY = (e.clientY - rect.top) / scale;
+    if (!rect.width || !rect.height) return;
 
-    const cellX = Math.floor(clientX / cellSize);
-    const cellY = Math.floor(clientY / cellSize);
+    const cellX = Math.floor(((e.clientX - rect.left) / rect.width) * grid.width);
+    const cellY = Math.floor(((e.clientY - rect.top) / rect.height) * grid.height);
 
     if (cellX >= 0 && cellX < grid.width && cellY >= 0 && cellY < grid.height) {
       onBlockCell(cellX, cellY);
