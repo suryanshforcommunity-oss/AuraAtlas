@@ -797,30 +797,6 @@ export const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
           {Math.round(scale * 100)}%
         </span>
       </div>
-
-      {/* Legend Overlay */}
-      <div className="absolute top-4 left-4 z-20 hidden lg:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800/80 text-[11px] backdrop-blur-md">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded bg-emerald-500"></span>
-          <span className="text-slate-300">Pick Station</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded bg-orange-500"></span>
-          <span className="text-slate-300">Drop Station</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded bg-cyan-400 flex items-center justify-center text-[8px] text-black font-bold">⚡</span>
-          <span className="text-slate-300">Charging Pad</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded bg-rose-600 animate-pulse"></span>
-          <span className="text-slate-300">Emergency Corridor</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded bg-amber-400"></span>
-          <span className="text-slate-300">Yielding Robot</span>
-        </div>
-      </div>
     </div>
   );
 };

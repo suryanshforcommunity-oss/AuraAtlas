@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
+import { LeftSidebar } from './components/LeftSidebar';
 import { WarehouseCanvas } from './components/WarehouseCanvas';
 import { Sidebar } from './components/Sidebar';
 import { OrderModal } from './components/OrderModal';
@@ -204,32 +205,37 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#07090e] text-slate-100 overflow-hidden">
-      {/* Top Navbar */}
+      {/* Top Navbar: Primary Simulation CTAs & High Priority Actions */}
       <Navbar
         state={simState}
         connected={connected}
-        heatOn={heatOn}
-        routeOn={routeOn}
-        blockMode={blockMode}
         onToggleStart={handleToggleStart}
         onStep={handleStep}
         onReset={handleReset}
-        onToggleHeat={() => setHeatOn(h => !h)}
-        onToggleRoutes={() => setRouteOn(r => !r)}
-        onToggleBlock={() => setBlockMode(b => !b)}
-        onClearBlocks={handleClearBlocks}
         onOpenOrderModal={() => setIsOrderModalOpen(true)}
         onOpenMapModal={() => setIsMapModalOpen(true)}
         onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
-        onNavigateHome={() => setActiveView('landing')}
-        onNavigateArchitecture={handleNavigateArchitecture}
-        onNavigateTelemetry={() => setActiveView('telemetry')}
-        onNavigateAnalytics={() => setActiveView('analytics')}
       />
 
-      {/* Main Workspace Area */}
+      {/* Main Workspace Area with Balanced Tri-Panel Layout */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Interactive Warehouse Canvas */}
+        {/* Left Tool Panel: Views, Map Layers, Legend & Fleet Quick Status */}
+        <LeftSidebar
+          state={simState}
+          heatOn={heatOn}
+          routeOn={routeOn}
+          blockMode={blockMode}
+          onToggleHeat={() => setHeatOn(h => !h)}
+          onToggleRoutes={() => setRouteOn(r => !r)}
+          onToggleBlock={() => setBlockMode(b => !b)}
+          onClearBlocks={handleClearBlocks}
+          onNavigateHome={() => setActiveView('landing')}
+          onNavigateArchitecture={handleNavigateArchitecture}
+          onNavigateTelemetry={() => setActiveView('telemetry')}
+          onNavigateAnalytics={() => setActiveView('analytics')}
+        />
+
+        {/* Center: Interactive Warehouse Simulation Canvas */}
         <WarehouseCanvas
           state={simState}
           heatOn={heatOn}
@@ -242,7 +248,7 @@ export const App: React.FC = () => {
           onCancelEmergency={handleCancelEmergency}
         />
 
-        {/* Right Dashboard Sidebar */}
+        {/* Right Dashboard Sidebar: Task Assignments, Stations, Conflicts, Hive Mind & Performance */}
         <Sidebar
           state={simState}
           onSetStationPriority={handleSetStationPriority}

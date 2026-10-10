@@ -3,18 +3,11 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Flame,
-  Route,
-  ShieldAlert,
   PlusCircle,
   Map,
   Activity,
   Zap,
   StepForward,
-  Home,
-  Trash2,
-  CheckCircle2,
-  Server,
   Siren
 } from 'lucide-react';
 import { SimulationState } from '../types/fleet';
@@ -22,52 +15,31 @@ import { SimulationState } from '../types/fleet';
 interface NavbarProps {
   state: SimulationState | null;
   connected: boolean;
-  heatOn: boolean;
-  routeOn: boolean;
-  blockMode: boolean;
   onToggleStart: () => void;
   onStep: () => void;
   onReset: () => void;
-  onToggleHeat: () => void;
-  onToggleRoutes: () => void;
-  onToggleBlock: () => void;
   onOpenOrderModal: () => void;
   onOpenMapModal: () => void;
-  onNavigateHome?: () => void;
-  onNavigateArchitecture?: () => void;
-  onNavigateTelemetry?: () => void;
-  onNavigateAnalytics?: () => void;
-  onClearBlocks?: () => void;
   onOpenEmergencyModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   state,
   connected,
-  heatOn,
-  routeOn,
-  blockMode,
   onToggleStart,
   onStep,
   onReset,
-  onToggleHeat,
-  onToggleRoutes,
-  onToggleBlock,
   onOpenOrderModal,
   onOpenMapModal,
-  onNavigateHome,
-  onNavigateArchitecture,
-  onNavigateTelemetry,
-  onNavigateAnalytics,
-  onClearBlocks,
   onOpenEmergencyModal,
 }) => {
   const isRunning = state?.running ?? false;
   const tick = state?.tick ?? 0;
+  const isEmergency = state?.emergency?.active ?? false;
 
   return (
-    <header className="h-16 bg-[#0b0f19]/90 border-b border-slate-800/80 px-4 md:px-6 flex items-center justify-between z-30 backdrop-blur-md">
-      {/* Left Title & Status */}
+    <header className="h-16 bg-[#0b0f19]/95 border-b border-slate-800/80 px-4 md:px-6 flex items-center justify-between z-30 backdrop-blur-md select-none">
+      {/* 1. Left: Brand & Live Tick Engine */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -78,6 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0b0f19] ${
                 connected ? 'bg-emerald-500 shadow-sm shadow-emerald-500' : 'bg-rose-500'
               }`}
+              title={connected ? 'Simulation Engine Connected' : 'Connecting to Engine...'}
             />
           </div>
           <div>
@@ -87,15 +60,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               </h1>
             </div>
             <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
-              <span>Multi-Agent Path Finding & Swarm Orchestration</span>
+              <span>Multi-Agent Swarm Orchestration</span>
               <span className="inline-block w-1 h-1 rounded-full bg-slate-600"></span>
-              <span className="text-indigo-300 font-mono">v2.4 TypeScript</span>
+              <span className="text-indigo-300 font-mono">v2.4 TS</span>
             </p>
           </div>
         </div>
 
         {/* Live Tick Pill */}
-        <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
           <Activity className="w-3.5 h-3.5 text-indigo-400 animate-spin" style={{ animationDuration: '4s' }} />
           <span className="text-slate-400">Tick:</span>
           <span className="font-mono font-bold text-indigo-300">{tick}</span>
@@ -103,14 +76,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Center Controls */}
-      <div className="flex items-center gap-2">
+      {/* 2. Center: Primary Simulation Controls */}
+      <div className="flex items-center gap-2 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner">
         <button
           onClick={onToggleStart}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md ${
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 ${
             isRunning
-              ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30'
-              : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30'
+              ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 shadow-amber-950/40'
+              : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 shadow-emerald-950/40'
           }`}
         >
           {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
@@ -120,148 +93,58 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           onClick={onStep}
           disabled={isRunning}
-          title="Advance single tick"
-          className="p-1.5 rounded-lg text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          title="Advance single simulation tick"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
         >
-          <StepForward className="w-4 h-4" />
+          <StepForward className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">Step</span>
         </button>
 
         <button
           onClick={onReset}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-semibold transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
+          title="Reset Simulation"
         >
           <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-          <span className="hidden sm:inline">Reset</span>
+          <span className="hidden md:inline">Reset</span>
         </button>
-
-        <div className="h-4 w-px bg-slate-800 mx-1 hidden md:block"></div>
-
-        {/* Toggles */}
-        <div className="hidden md:flex items-center gap-1.5">
-          <button
-            onClick={onToggleHeat}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              heatOn
-                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 glow-rose'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Flame className="w-3.5 h-3.5" />
-            <span>Heatmap</span>
-          </button>
-
-          <button
-            onClick={onToggleRoutes}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              routeOn
-                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 glow-indigo'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Route className="w-3.5 h-3.5" />
-            <span>Routes</span>
-          </button>
-
-          <button
-            onClick={onToggleBlock}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              blockMode
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 glow-amber'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <ShieldAlert className="w-3.5 h-3.5" />
-            <span>{blockMode ? 'Block Active' : 'Block Mode'}</span>
-          </button>
-
-          {onClearBlocks && (
-            <button
-              onClick={onClearBlocks}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 transition-all"
-              title="Clear all user-added obstacles"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Remove Blocks</span>
-            </button>
-          )}
-        </div>
       </div>
 
-      {/* Right Actions */}
+      {/* 3. Right: Mission Critical Actions */}
       <div className="flex items-center gap-2">
-        {onNavigateHome && (
-          <button
-            onClick={onNavigateHome}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700 transition-all"
-            title="Return to Landing Page"
-          >
-            <Home className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline">Landing Page</span>
-          </button>
-        )}
-
-        {onNavigateTelemetry && (
-          <button
-            onClick={onNavigateTelemetry}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-500/30 transition-all"
-            title="AGV Swarm Telemetry"
-          >
-            <Activity className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">Telemetry</span>
-          </button>
-        )}
-
-        {onNavigateAnalytics && (
-          <button
-            onClick={onNavigateAnalytics}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-500/30 transition-all"
-            title="Swarm Heatmaps & Analytics"
-          >
-            <Route className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">Analytics</span>
-          </button>
-        )}
-
-        {onNavigateArchitecture && (
-          <button
-            onClick={onNavigateArchitecture}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700 transition-all"
-            title="View System Architecture"
-          >
-            <Server className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">Architecture</span>
-          </button>
-        )}
-
+        {/* Emergency / VVIP Corridor Trigger */}
         {onOpenEmergencyModal && (
           <button
             onClick={onOpenEmergencyModal}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md ${
-              state?.emergency?.active
-                ? 'bg-rose-600 text-white border border-rose-400 shadow-rose-600/30 animate-pulse'
-                : 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30'
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 border ${
+              isEmergency
+                ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white border-rose-400 shadow-rose-600/40 animate-pulse'
+                : 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border-rose-500/40 shadow-rose-950/30'
             }`}
-            title="Activate Dynamic Emergency / VVIP Corridor"
+            title="Activate Dynamic Emergency / VVIP Fast-Track Corridor"
           >
-            <Siren className="w-3.5 h-3.5 text-rose-400" />
-            <span>{state?.emergency?.active ? 'Corridor Active' : 'Emergency Corridor'}</span>
+            <Siren className={`w-4 h-4 ${isEmergency ? 'animate-bounce text-white' : 'text-rose-400'}`} />
+            <span className="hidden sm:inline">{isEmergency ? 'Corridor Active' : 'Emergency Corridor'}</span>
           </button>
         )}
 
+        {/* Dispatch Order Action */}
         <button
           onClick={onOpenOrderModal}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-md shadow-indigo-500/20 border border-indigo-400/30 transition-all"
+          className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-md shadow-indigo-500/20 border border-indigo-400/30 transition-all active:scale-95"
         >
-          <PlusCircle className="w-3.5 h-3.5" />
+          <PlusCircle className="w-4 h-4" />
           <span>Dispatch Order</span>
         </button>
 
+        {/* Map & Swarm Configuration */}
         <button
           onClick={onOpenMapModal}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700 transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700 transition-all active:scale-95"
+          title="Select warehouse benchmark map & fleet sizing"
         >
           <Map className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="hidden sm:inline">Map & Swarm</span>
+          <span className="hidden lg:inline">Map & Swarm</span>
         </button>
       </div>
     </header>
