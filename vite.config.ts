@@ -22,4 +22,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-three': ['three'],
+          'vendor-ogl': ['ogl'],
+          'vendor-icons': ['lucide-react', 'react-icons'],
+        },
+      },
+    },
+  },
 });
